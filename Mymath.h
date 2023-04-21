@@ -75,6 +75,7 @@ void VectorScreenPrintf(int x, int y, const Vector3& vector, const char* label) 
 
 #pragma endregion
 
+#pragma region Matrix3x3
 Matrix4x4 Add(const Matrix4x4& m1, const Matrix4x4& m2) {
 	Matrix4x4 tmp;
 	tmp.m[0][0] = m1.m[0][0] + m2.m[0][0];
@@ -275,7 +276,7 @@ Matrix4x4 MakeIdentity4x4() {
 	return tmp;
 }
 
-void MatrixScreenPrintf(int x,int y,const Matrix4x4& matrix , const char* message) {
+void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* message) {
 	Novice::ScreenPrintf(x, y, message);
 	for (int row = 0; row < 4; ++row) {
 		for (int column = 0; column < 4; ++column) {
@@ -283,3 +284,5 @@ void MatrixScreenPrintf(int x,int y,const Matrix4x4& matrix , const char* messag
 		}
 	}
 }
+#pragma endregion
+
