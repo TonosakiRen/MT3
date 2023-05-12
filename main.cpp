@@ -11,28 +11,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ライブラリの初期化
 	Novice::Initialize(kWindowTitle, kWindowWidth, kWindowHeight);
 
-	//cross式確認
-	Vector3 v1{ 1.2f,-3.9f,2.5f };
-	Vector3 v2{ 2.8f,0.4f,-1.3f };
-	Vector3 cross = Cross(v1, v2);
-
+	//裏表
+	float crossValue = 0.0f;
 
 	Vector3 kLocalVertices[3] = { {0.0f,0.3f,0.0f},{-0.3f,-0.3f,0.0f},{0.3f,-0.3f,0.0f} };
 
 	Vector3 scale = { 1.0f,1.0f,1.0f };
 	Vector3 rotate = { 0.0f,0.0f,0.0f };
 	Vector3 translate = { 0.0f,0.0f,0.0f };
-	Vector3 cameraPosition = {0.0f,0.0f,-0.5f};
+	Vector3 cameraPosition = { 0.0f,0.0f,-0.5f };
 
 
 	Matrix4x4 worldMatrix = MakeAffineMatrix(scale, rotate, translate);
 	Matrix4x4 cameraMatrix = MakeAffineMatrix(scale, rotate, cameraPosition);
 	Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f,float(kWindowWidth) / float(kWindowHeight),0.1f,100.0f);
+	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
 	///WVPMatrixを作る
 	Matrix4x4 worldViewProjectionMatrix = worldMatrix * viewMatrix * projectionMatrix;
 	//Viewportmatrixを作る
-	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth) , float(kWindowHeight), 0.0f, 1.0f);
+	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 	//Screen空間へと頂点を作る
 	Vector3 screenVeretices[3];
 	for (uint32_t i = 0; i < 3; ++i) {
@@ -69,8 +66,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		rotate.y += 0.01f;
 
 
+
+
 		worldMatrix = MakeAffineMatrix(scale, rotate, translate);
-		cameraMatrix = MakeAffineMatrix(scale, {0,0,0}, cameraPosition);
+		cameraMatrix = MakeAffineMatrix(scale, { 0,0,0 }, cameraPosition);
 		viewMatrix = Inverse(cameraMatrix);
 		///WVPMatrixを作る
 		worldViewProjectionMatrix = worldMatrix * viewMatrix * projectionMatrix;
@@ -82,6 +81,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			screenVeretices[i] = Transform(ndcVertex, viewportMatrix);
 		}
 
+		Vector3 TriangleDirection = Cross(screenVeretices[1] - screenVeretices[0], screenVeretices[2] - screenVeretices[1]);
+		crossValue = Dot(Vector3{ 0.0f,0.0f,1.0f },TriangleDirection);
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -89,9 +91,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓描画処理ここから
 		///
-		
-		VectorScreenPrintf(0, 0, cross, "Cross");
-		Novice::DrawTriangle(int(screenVeretices[0].x), int(screenVeretices[0].y), int(screenVeretices[1].x), int(screenVeretices[1].y), int(screenVeretices[2].x), int(screenVeretices[2].y), RED, kFillModeSolid);
+
+		if (crossValue <= 0.0f) {
+			Novice::DrawTriangle(int(screenVeretices[0].x), int(screenVeretices[0].y), int(screenVeretices[1].x), int(screenVeretices[1].y), int(screenVeretices[2].x), int(screenVeretices[2].y), RED, kFillModeSolid);
+		}
 
 		///
 		/// ↑描画処理ここまで
