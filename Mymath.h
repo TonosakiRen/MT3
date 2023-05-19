@@ -87,6 +87,22 @@ inline Vector3 Cross(const Vector3& v1, const Vector3& v2) {
 	return { (v1.y * v2.z - v1.z * v2.y),(v1.z * v2.x - v1.x * v2.z),(v1.x * v2.y - v1.y * v2.x)};
 }
 
+inline Vector3 operator *(const Vector3& v, const Matrix4x4& m) {
+
+	Vector3 result;
+	result.x = v.x * m.m[0][0] + v.y * m.m[1][0] + v.z * m.m[2][0] + 1.0f * m.m[3][0];
+	result.y = v.x * m.m[0][1] + v.y * m.m[1][1] + v.z * m.m[2][1] + 1.0f * m.m[3][1];
+	result.z = v.x * m.m[0][2] + v.y * m.m[1][2] + v.z * m.m[2][2] + 1.0f * m.m[3][2];
+	float w = v.x * m.m[0][3] + v.y * m.m[1][3] + v.z * m.m[2][3] + 1.0f * m.m[3][3];
+
+	assert(w != 0.0f);
+	result.x /= w;
+	result.y /= w;
+	result.z /= w;
+
+	return result;
+}
+
 #pragma endregion
 #pragma region Matrix4x4
 Matrix4x4 Add(const Matrix4x4& m1, const Matrix4x4& m2) {
@@ -423,6 +439,9 @@ Vector3 Transform(const Vector3& vector, const Matrix4x4& matrix) {
 	return result;
 
 }
+
+
+
 Matrix4x4 MakeRotateXMatrix(float radian) {
 
 	Matrix4x4 tmp;
