@@ -8,7 +8,21 @@
 #include <Novice.h>
 #include <assert.h>
 
+struct Line {
+	Vector3 origin; //始点
+	Vector3 diff;//終点への差分ベクトル
+};
+struct Ray {
+	Vector3 origin; //始点
+	Vector3 diff;//終点への差分ベクトル
+};
+struct Segment {
+	Vector3 origin; //始点
+	Vector3 diff;//終点への差分ベクトル
+};
+
 #pragma region Vector3
+
 //Vetor3
 //加算
 inline Vector3 Add(const Vector3& v1, const Vector3& v2) {
@@ -100,6 +114,17 @@ inline Vector3 operator *(const Vector3& v, const Matrix4x4& m) {
 	result.y /= w;
 	result.z /= w;
 
+	return result;
+}
+
+inline Vector3 Project(const Vector3& v1, const Vector3 v2) {
+	Vector3 norm = Normalize(v2);
+	Vector3 result = norm * (Dot(v1, norm));
+	return result;
+}
+
+inline Vector3 ClosestPoint(const Vector3& point, const Segment& segment) {
+	Vector3 result = segment.origin + Project(point - segment.origin, segment.diff);
 	return result;
 }
 

@@ -87,10 +87,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ライブラリの初期化
 	Novice::Initialize(kWindowTitle, kWindowWidth, kWindowHeight);
 
-	Sphere sphere = {
-		{0.0f,0.0f,0.0f},
-		1.0f
-	};
+	Segment segment{ {-2.0f,-1.0f,0.0f},{3.0f,2.0f,2.0f} };
+	Vector3 point {-1.5f,0.6f,0.6f };
+
+
+	Vector3 project = Project(Subtract(point, segment.origin),segment.diff);
+	Vector3 closestPoint = ClosestPoint(point,segment);
+
+	Sphere pointSphere{ point,0.01f };
+	Sphere closestPointSphere{ closestPoint,0.01f };
+
+	
+
 
 	Vector3 scale = { 1.0f,1.0f,1.0f };
 	Vector3 rotate = { 0.0f,0.0f,0.0f };
@@ -101,7 +109,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Matrix4x4 cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameraPosition);
 	Matrix4x4 viewMatrix = Inverse(cameraMatrix);
 	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
-	
+
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
@@ -115,7 +123,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓更新処理ここから
 		///
-		
+	
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameraPosition);
 		viewMatrix = Inverse(cameraMatrix);
 
@@ -123,8 +131,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Begin("window");
 		ImGui::DragFloat3("CameraTranslate",&cameraPosition.x,0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("SphereCenter", &sphere.pos.x, 0.01f);
-		ImGui::DragFloat("SphereRadius", &sphere.radius, 0.01f);
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -134,9 +140,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
-		DrawSphere(sphere,viewMatrix * projectionMatrix, viewportMatrix,WHITE);
+		Vector3 start = Transform(Transform(segment.origin, viewMatrix * projectionMatrix), viewportMatrix);
+		Vector3 end = Transform(Transform(Add(segment.origin,segment.diff), viewMatrix * projectionMatrix), viewportMatrix);
+		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
 
+		DrawSphere(pointSphere, viewMatrix * projectionMatrix, viewportMatrix, RED);
+		DrawSphere(closestPointSphere, viewMatrix * projectionMatrix, viewportMatrix, BLACK);
+		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
 
 		///
 		/// ↑描画処理ここまで
