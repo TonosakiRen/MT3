@@ -9,18 +9,63 @@ const char kWindowTitle[] = "学籍番号";
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
+
+struct Plane {
+	Vector3 normal;//法線
+	float distance;//距離
+};
 struct Sphere {
-	Vector3 pos; // 中心点
+	Vector3 center; // 中心点
 	float radius; //半径
 };
+
+Vector3 Normal(const Vector3& a,const Vector3& b, const Vector3 c) {
+	return Normalize(Cross(b - a, c - b));
+}
+
 bool IsCollision(const Sphere& s1, const Sphere& s2) {
-	float length = Length(s1.pos - s2.pos);
+	float length = Length(s1.center - s2.center);
 	if (s1.radius + s2.radius >= length) {
 		return true;
 	}
 	return false;
 }
-void CameraMove(Vector3& cameraPos , Vector3& cameraRotate) {
+bool IsCollision(const Sphere& sphere, const Plane& plane) {
+	float k = std::abs(Dot(plane.normal,sphere.center) - plane.distance );
+	if (k <= sphere.radius) {
+		return true;
+	}
+	return false;
+}
+
+Vector3 Perpendicular(const Vector3& vector) {
+	if (vector.x != 0.0f || vector.y != 0.0f) {
+		return { -vector.y,vector.x,0.0f };
+	}
+	return { 0.0f,-vector.z,vector.y };
+}
+
+void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+	Vector3 center = Multiply(plane.distance, plane.normal);
+	Vector3 perpendiculars[4];
+	perpendiculars[0] = Normalize(Perpendicular(plane.normal));
+	perpendiculars[1] = Cross(plane.normal, perpendiculars[0]);
+	perpendiculars[2] = -perpendiculars[0];
+	perpendiculars[3] = -perpendiculars[1];
+
+	Vector3 points[4];
+	for (int32_t index = 0; index < 4; ++index) {
+		Vector3 extend = Multiply(2.0f,perpendiculars[index]);
+		Vector3 point = Add(center, extend);
+		points[index] = Transform(Transform(point, viewProjectionMatrix),viewportMatrix);
+	}
+	Novice::DrawLine(static_cast<int>(points[0].x), static_cast<int>(points[0].y), static_cast<int>(points[1].x), static_cast<int>(points[1].y), color);
+	Novice::DrawLine(static_cast<int>(points[1].x), static_cast<int>(points[1].y), static_cast<int>(points[2].x), static_cast<int>(points[2].y), color);
+	Novice::DrawLine(static_cast<int>(points[2].x), static_cast<int>(points[2].y), static_cast<int>(points[3].x), static_cast<int>(points[3].y), color);
+	Novice::DrawLine(static_cast<int>(points[3].x), static_cast<int>(points[3].y), static_cast<int>(points[0].x), static_cast<int>(points[0].y), color);
+}
+
+void CameraMove(Vector3& cameracenter , Vector3& cameraRotate) {
 	Input* input = Input::GetInstance();
 
 	auto mouseMove = input->GetMouseMove();
@@ -35,15 +80,15 @@ void CameraMove(Vector3& cameraPos , Vector3& cameraRotate) {
 		Matrix4x4 rotMat = MakeRotateXYZMatrix(cameraRotate);
 		Vector3 cameraX = GetXAxis(rotMat) * static_cast<float>(-mouseMove.lX) * 0.01f;
 		Vector3 cameraY = GetYAxis(rotMat) * static_cast<float>(mouseMove.lY) * 0.01f;
-		cameraPos += cameraX + cameraY;
+		cameracenter += cameraX + cameraY;
 	}
 	else if (wheel != 0) {
 		Matrix4x4 rotMat = MakeRotateXYZMatrix(cameraRotate);
 		Vector3 cameraZ = GetZAxis(rotMat) * (static_cast<float>(wheel / 120) * 0.5f);
-		cameraPos += cameraZ;
+		cameracenter += cameraZ;
 	}
 	ImGui::Begin("Camera");
-	ImGui::DragFloat3("Camera position", &cameraPos.x, 0.01f);
+	ImGui::DragFloat3("Camera centerition", &cameracenter.x, 0.01f);
 	ImGui::DragFloat3("Camera rotate", &cameraRotate.x, 0.01f);
 	ImGui::End();
 }
@@ -102,9 +147,9 @@ void DrawSphere(const Sphere& sphere,const Matrix4x4& viewProjectionMatrix, cons
 			a = {std::cos(lat) * std::cos(lon),std::sin(lat),std::cos(lat) * std::sin(lon)};
 			b = { std::cos(lat + kLatEvery) * std::cos(lon),std::sin(lat + kLatEvery),std::cos(lat + kLatEvery) * std::sin(lon) };
 			c = { std::cos(lat) * std::cos(lon + kLonEvery),std::sin(lat),std::cos(lat) * std::sin(lon + kLonEvery) };
-			a = a * sphere.radius + sphere.pos;
-			b = b * sphere.radius + sphere.pos;
-			c = c * sphere.radius + sphere.pos;
+			a = a * sphere.radius + sphere.center;
+			b = b * sphere.radius + sphere.center;
+			c = c * sphere.radius + sphere.center;
 			// a,b,cをscreen座標系まで変換
 			a = a * viewProjectionMatrix * viewportMatrix;
 			b = b * viewProjectionMatrix * viewportMatrix;
@@ -125,10 +170,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Vector3 scale = { 1.0f,1.0f,1.0f };
 	Vector3 rotate = { 0.0f,0.0f,0.0f };
 	Vector3 translate = { 0.0f,0.0f,0.0f };
-	Vector3 cameraPosition = { 0.0f,1.9f,-6.49f };
+	Vector3 cameracenterition = { 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate = { 0.26f,0.0f,0.0f };
 
-	Matrix4x4 cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameraPosition);
+	Matrix4x4 cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 	Matrix4x4 viewMatrix = Inverse(cameraMatrix);
 	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
 
@@ -136,7 +181,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
 	Sphere a = { {-3.0f,3.0f,0.0f}, 2.0f};
-	Sphere b = { {3.0f,3.0f,0.0f}, 2.0f };
+	Vector3 normal = { 0.0f,1.0f,0.0f };
+	Plane p = { {Normalize(normal)},0.2f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -149,16 +195,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 	
-		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameraPosition);
+		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		bool hit = IsCollision(a, b);
+		bool hit = IsCollision(a, p);
 
-		CameraMove(cameraPosition,cameraRotate);
+		CameraMove(cameracenterition,cameraRotate);
 
 		ImGui::Begin("window");
-		ImGui::DragFloat3("CameraTranslate",&cameraPosition.x,0.01f);
-		ImGui::DragFloat3("aPos", &a.pos.x, 0.01f);
+		ImGui::DragFloat3("CameraTranslate",&cameracenterition.x,0.01f);
+		ImGui::DragFloat3("acenter", &a.center.x, 0.01f);
+		ImGui::DragFloat3("p.normal.", &p.normal.x, 0.01f);
+		p.normal = Normalize(p.normal);
+		ImGui::DragFloat("distance", &p.distance, 0.01f);
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -173,7 +222,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		else {
 			DrawSphere(a, viewMatrix * projectionMatrix,viewportMatrix,WHITE);
 		}
-		DrawSphere(b, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+		DrawPlane(p, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
 		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
 
