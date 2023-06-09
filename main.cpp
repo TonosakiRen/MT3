@@ -4,6 +4,7 @@
 #include "Key.h"
 #include <cmath>
 #include <imgui.h>
+#include <Input.h>
 const char kWindowTitle[] = "学籍番号";
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
@@ -12,6 +13,40 @@ struct Sphere {
 	Vector3 pos; // 中心点
 	float radius; //半径
 };
+bool IsCollision(const Sphere& s1, const Sphere& s2) {
+	float length = Length(s1.pos - s2.pos);
+	if (s1.radius + s2.radius >= length) {
+		return true;
+	}
+	return false;
+}
+void CameraMove(Vector3& cameraPos , Vector3& cameraRotate) {
+	Input* input = Input::GetInstance();
+
+	auto mouseMove = input->GetMouseMove();
+	auto wheel = input->GetWheel();
+
+	if (input->IsPressMouse(1)) {
+		float rot = static_cast<float>(M_PI / 180.0f);
+		cameraRotate.x += rot * mouseMove.lY * 0.1f;
+		cameraRotate.y += rot * mouseMove.lX * 0.1f;
+	}
+	else if (input->IsPressMouse(2)) {
+		Matrix4x4 rotMat = MakeRotateXYZMatrix(cameraRotate);
+		Vector3 cameraX = GetXAxis(rotMat) * static_cast<float>(-mouseMove.lX) * 0.01f;
+		Vector3 cameraY = GetYAxis(rotMat) * static_cast<float>(mouseMove.lY) * 0.01f;
+		cameraPos += cameraX + cameraY;
+	}
+	else if (wheel != 0) {
+		Matrix4x4 rotMat = MakeRotateXYZMatrix(cameraRotate);
+		Vector3 cameraZ = GetZAxis(rotMat) * (static_cast<float>(wheel / 120) * 0.5f);
+		cameraPos += cameraZ;
+	}
+	ImGui::Begin("Camera");
+	ImGui::DragFloat3("Camera position", &cameraPos.x, 0.01f);
+	ImGui::DragFloat3("Camera rotate", &cameraRotate.x, 0.01f);
+	ImGui::End();
+}
 
 void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix) {
 	const float kGridHalWidth = 2.0f;//Grid1の半分の幅
@@ -87,19 +122,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// ライブラリの初期化
 	Novice::Initialize(kWindowTitle, kWindowWidth, kWindowHeight);
 
-	Segment segment{ {-2.0f,-1.0f,0.0f},{3.0f,2.0f,2.0f} };
-	Vector3 point {-1.5f,0.6f,0.6f };
-
-
-	Vector3 project = Project(Subtract(point, segment.origin),segment.diff);
-	Vector3 closestPoint = ClosestPoint(point,segment);
-
-	Sphere pointSphere{ point,0.01f };
-	Sphere closestPointSphere{ closestPoint,0.01f };
-
-	
-
-
 	Vector3 scale = { 1.0f,1.0f,1.0f };
 	Vector3 rotate = { 0.0f,0.0f,0.0f };
 	Vector3 translate = { 0.0f,0.0f,0.0f };
@@ -112,6 +134,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
+
+	Sphere a = { {-3.0f,3.0f,0.0f}, 2.0f};
+	Sphere b = { {3.0f,3.0f,0.0f}, 2.0f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -127,10 +152,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameraPosition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		
+		bool hit = IsCollision(a, b);
+
+		CameraMove(cameraPosition,cameraRotate);
+
 		ImGui::Begin("window");
 		ImGui::DragFloat3("CameraTranslate",&cameraPosition.x,0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
+		ImGui::DragFloat3("aPos", &a.pos.x, 0.01f);
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -139,13 +167,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓描画処理ここから
 		///
+		if (hit == true) {
+			DrawSphere(a, viewMatrix * projectionMatrix, viewportMatrix, RED);
+		}
+		else {
+			DrawSphere(a, viewMatrix * projectionMatrix,viewportMatrix,WHITE);
+		}
+		DrawSphere(b, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
-		Vector3 start = Transform(Transform(segment.origin, viewMatrix * projectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin,segment.diff), viewMatrix * projectionMatrix), viewportMatrix);
-		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
-
-		DrawSphere(pointSphere, viewMatrix * projectionMatrix, viewportMatrix, RED);
-		DrawSphere(closestPointSphere, viewMatrix * projectionMatrix, viewportMatrix, BLACK);
 		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
 
 		///

@@ -23,6 +23,19 @@ struct Segment {
 
 #pragma region Vector3
 
+Vector3 GetXAxis(Matrix4x4 m){
+
+	return { m.m[0][0],m.m[0][1],m.m[0][2] };
+}
+Vector3 GetYAxis(Matrix4x4 m) {
+
+	return { m.m[1][0],m.m[1][1],m.m[1][2] };
+}
+Vector3 GetZAxis(Matrix4x4 m) {
+
+	return { m.m[2][0],m.m[2][1],m.m[2][2] };
+}
+
 //Vetor3
 //加算
 inline Vector3 Add(const Vector3& v1, const Vector3& v2) {
@@ -545,6 +558,14 @@ Matrix4x4 MakeRotateZMatrix(float radian) {
 
 	return tmp;
 }
+
+Matrix4x4 MakeRotateXYZMatrix(const Vector3& radian) {
+
+	return MakeRotateXMatrix(radian.x) * MakeRotateYMatrix(radian.y) * MakeRotateZMatrix(radian.z);;
+}
+
+
+
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate) {
 	Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
 	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
