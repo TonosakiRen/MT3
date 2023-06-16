@@ -19,6 +19,20 @@ struct Sphere {
 	float radius; //半径
 };
 
+bool IsCollision(const Segment& segment, const Plane& plane) {
+	//まず垂直判定を行うために、法線と線の内積を求める
+	float dot = Dot(plane.normal, segment.diff);
+	//垂直 = 並行で絵あるので、衝突しているはずがない
+	if (dot == 0.0f) {
+		return false;
+	}
+	//tを求める
+	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+	if (t >= 0.0f && t <= 1.0f) {
+		return true;
+	}
+	return false;
+}
 Vector3 Normal(const Vector3& a,const Vector3& b, const Vector3 c) {
 	return Normalize(Cross(b - a, c - b));
 }
@@ -161,6 +175,14 @@ void DrawSphere(const Sphere& sphere,const Matrix4x4& viewProjectionMatrix, cons
 	}
 
 }
+
+void DrawLine(const Vector3& start, const Vector3& end, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix,unsigned int color) {
+	Vector3 a = start * viewProjectionMatrix * viewportMatrix;
+	Vector3 b = end * viewProjectionMatrix * viewportMatrix;
+
+	Novice::DrawLine(int(a.x), int(a.y), int(b.x), int(b.y), color);
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -184,6 +206,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Vector3 normal = { 0.0f,1.0f,0.0f };
 	Plane p = { {Normalize(normal)},0.2f };
 
+	Segment segment = { {0.0f,0.0f,0.0f},{2.0f,2.0f,0.0f} };
+
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
 		// フレームの開始
@@ -198,13 +222,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		bool hit = IsCollision(a, p);
+		bool hit = IsCollision(segment, p);
 
 		CameraMove(cameracenterition,cameraRotate);
 
 		ImGui::Begin("window");
-		ImGui::DragFloat3("CameraTranslate",&cameracenterition.x,0.01f);
-		ImGui::DragFloat3("acenter", &a.center.x, 0.01f);
+		ImGui::DragFloat3("origin", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("diff", &segment.diff.x, 0.01f);
 		ImGui::DragFloat3("p.normal.", &p.normal.x, 0.01f);
 		p.normal = Normalize(p.normal);
 		ImGui::DragFloat("distance", &p.distance, 0.01f);
@@ -217,10 +241,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 		if (hit == true) {
-			DrawSphere(a, viewMatrix * projectionMatrix, viewportMatrix, RED);
+			DrawLine(segment.origin, segment.origin + segment.diff,viewMatrix * projectionMatrix, viewportMatrix, RED);
 		}
 		else {
-			DrawSphere(a, viewMatrix * projectionMatrix,viewportMatrix,WHITE);
+			DrawLine(segment.origin, segment.origin + segment.diff, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 		}
 		DrawPlane(p, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
