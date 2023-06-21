@@ -18,6 +18,9 @@ struct Sphere {
 	Vector3 center; // 中心点
 	float radius; //半径
 };
+struct Triangle {
+	Vector3 vertices[3];
+};
 
 bool IsCollision(const Segment& segment, const Plane& plane) {
 	//まず垂直判定を行うために、法線と線の内積を求める
@@ -35,6 +38,34 @@ bool IsCollision(const Segment& segment, const Plane& plane) {
 }
 Vector3 Normal(const Vector3& a,const Vector3& b, const Vector3 c) {
 	return Normalize(Cross(b - a, c - b));
+}
+
+bool IsCollision(const Triangle& triangle, const Segment& segment) {
+
+	Vector3 normal = Normal(triangle.vertices[0], triangle.vertices[1], triangle.vertices[2]);
+
+	//まず垂直判定を行うために、法線と線の内積を求める
+	float dot = Dot(normal, segment.diff);
+	//垂直 = 並行で絵あるので、衝突しているはずがない
+	if (dot == 0.0f) {
+		return false;
+	}
+	float distance = Dot(triangle.vertices[0], normal);
+	//tを求める
+	float t = (distance - Dot(segment.origin, normal)) / dot;
+	//衝突点を求める
+	Vector3 point = segment.origin + segment.diff * t;
+	//各辺を結んだベクトルと、頂点と衝突店ｐを結んだベクトルのクロス積をとる
+	Vector3 cross01 = Cross(triangle.vertices[1] - triangle.vertices[0], point- triangle.vertices[1]);
+	Vector3 cross12 = Cross(triangle.vertices[2] - triangle.vertices[1], point - triangle.vertices[2]);
+	Vector3 cross20 = Cross(triangle.vertices[0] - triangle.vertices[2], point - triangle.vertices[0]);
+	//すべての三角形のクロス積と法線が同じ方向を向いていたら衝突	
+	if (Dot(cross01, normal) >= 0.0f &&
+		Dot(cross12, normal) >= 0.0f &&
+		Dot(cross20, normal) >= 0.0f) {
+		return true;
+	}
+	return false;
 }
 
 bool IsCollision(const Sphere& s1, const Sphere& s2) {
@@ -183,6 +214,16 @@ void DrawLine(const Vector3& start, const Vector3& end, const Matrix4x4& viewPro
 	Novice::DrawLine(int(a.x), int(a.y), int(b.x), int(b.y), color);
 }
 
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, unsigned int color) {
+	Triangle tmp;
+	for (int i = 0; i < 3; i++) {
+		tmp.vertices[i] = triangle.vertices[i] * viewProjectionMatrix * viewportMatrix;
+	}
+	Novice::DrawLine(int(tmp.vertices[0].x), int(tmp.vertices[0].y), int(tmp.vertices[1].x), int(tmp.vertices[1].y), color);
+	Novice::DrawLine(int(tmp.vertices[1].x), int(tmp.vertices[1].y), int(tmp.vertices[2].x), int(tmp.vertices[2].y), color);
+	Novice::DrawLine(int(tmp.vertices[2].x), int(tmp.vertices[2].y), int(tmp.vertices[0].x), int(tmp.vertices[0].y), color);
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -202,9 +243,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	Sphere a = { {-3.0f,3.0f,0.0f}, 2.0f};
-	Vector3 normal = { 0.0f,1.0f,0.0f };
-	Plane p = { {Normalize(normal)},0.2f };
+	Triangle triangle;
+	triangle.vertices[0] = { 0.0f,1.0f,0.0f };
+	triangle.vertices[1] = { -1.0f,0.0f,0.0f };
+	triangle.vertices[2] = { 1.0f,0.0f,0.0f };
 
 	Segment segment = { {0.0f,0.0f,0.0f},{2.0f,2.0f,0.0f} };
 
@@ -222,16 +264,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		bool hit = IsCollision(segment, p);
+		bool hit = IsCollision(triangle,segment);
 
 		CameraMove(cameracenterition,cameraRotate);
 
 		ImGui::Begin("window");
 		ImGui::DragFloat3("origin", &segment.origin.x, 0.01f);
 		ImGui::DragFloat3("diff", &segment.diff.x, 0.01f);
-		ImGui::DragFloat3("p.normal.", &p.normal.x, 0.01f);
-		p.normal = Normalize(p.normal);
-		ImGui::DragFloat("distance", &p.distance, 0.01f);
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -246,7 +285,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		else {
 			DrawLine(segment.origin, segment.origin + segment.diff, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 		}
-		DrawPlane(p, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+		DrawTriangle(triangle, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
 		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
 
