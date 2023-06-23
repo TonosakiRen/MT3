@@ -5,6 +5,7 @@
 #include <cmath>
 #include <imgui.h>
 #include <Input.h>
+#include <algorithm>
 const char kWindowTitle[] = "学籍番号";
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
@@ -34,6 +35,23 @@ bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 	}
 	return false;
 }
+
+bool IsCollision(const AABB& aabb, const  Sphere& sphere) {
+	//最近接点を求める
+	Vector3 closestPoint
+	{ std::clamp(sphere.center.x,aabb.min.x,aabb.max.x),
+	 std::clamp(sphere.center.y,aabb.min.y,aabb.max.y),
+	 std::clamp(sphere.center.z,aabb.min.z,aabb.max.z)
+	};
+	//最近接点と球の中心との距離を求める
+	float distance = Length(closestPoint - sphere.center);
+	//距離が半径よりも小さければ衝突
+	if (distance <= sphere.radius) {
+		return true;
+	}
+	return false;
+}
+
 bool IsCollision(const Segment& segment, const Plane& plane) {
 	//まず垂直判定を行うために、法線と線の内積を求める
 	float dot = Dot(plane.normal, segment.diff);
@@ -87,6 +105,8 @@ bool IsCollision(const Sphere& s1, const Sphere& s2) {
 	}
 	return false;
 }
+
+
 bool IsCollision(const Sphere& sphere, const Plane& plane) {
 	float k = std::abs(Dot(plane.normal,sphere.center) - plane.distance );
 	if (k <= sphere.radius) {
@@ -279,10 +299,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		.max{0.0f,0.0f,0.0f},
 	};
 
-	AABB aabb2{
-		.min{0.2f,0.2f,0.2f},
-		.max{1.0f,1.0f,1.0f},
-	};
+	Sphere sphere{ {0.0f,0.0f,0.0f},1.0f };
+	
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -298,7 +316,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		bool hit = IsCollision(aabb1,aabb2);
+		bool hit = IsCollision(aabb1,sphere);
 
 		CameraMove(cameracenterition,cameraRotate);
 
@@ -311,14 +329,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
 		aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
 		aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
-		ImGui::DragFloat3("aabb2 min ", &aabb2.min.x, 0.01f);
-		ImGui::DragFloat3("aabb2 max ", &aabb2.max.x, 0.01f);
-		aabb2.min.x = (std::min)(aabb2.min.x, aabb2.max.x);
-		aabb2.max.x = (std::max)(aabb2.min.x, aabb2.max.x);
-		aabb2.min.y = (std::min)(aabb2.min.y, aabb2.max.y);
-		aabb2.max.y = (std::max)(aabb2.min.y, aabb2.max.y);
-		aabb2.min.z = (std::min)(aabb2.min.z, aabb2.max.z);
-		aabb2.max.z = (std::max)(aabb2.min.z, aabb2.max.z);
+
+		ImGui::DragFloat3("sphere center ", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("sphere radius ", &sphere.radius, 0.01f);
+		
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -335,7 +349,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		else {
 			DrawAABB(aabb1, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 		}
-		DrawAABB(aabb2, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+
+		DrawSphere(sphere, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
 
 		///
