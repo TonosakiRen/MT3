@@ -21,7 +21,19 @@ struct Sphere {
 struct Triangle {
 	Vector3 vertices[3];
 };
+struct AABB {
+	Vector3 min;//最小点
+	Vector3 max;//最大点
+};
 
+bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
+	if ((aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
+		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
+		(aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z)){
+		return true;
+	}
+	return false;
+}
 bool IsCollision(const Segment& segment, const Plane& plane) {
 	//まず垂直判定を行うために、法線と線の内積を求める
 	float dot = Dot(plane.normal, segment.diff);
@@ -214,6 +226,25 @@ void DrawLine(const Vector3& start, const Vector3& end, const Matrix4x4& viewPro
 	Novice::DrawLine(int(a.x), int(a.y), int(b.x), int(b.y), color);
 }
 
+void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, unsigned int color){
+	Vector3 vertices[] = { aabb.min,
+		{aabb.max.x,aabb.min.y,aabb.min.z},
+		{aabb.max.x,aabb.min.y,aabb.max.z},
+		{aabb.min.x,aabb.min.y,aabb.max.z},
+		{aabb.min.x,aabb.max.y,aabb.min.z},
+		{aabb.max.x,aabb.max.y,aabb.min.z},
+		aabb.max,
+		{aabb.min.x,aabb.max.y,aabb.max.z } };
+
+	for (int i = 0; i < 4; i++) {
+		int j = (i + 1) % 4;
+		DrawLine(vertices[i], vertices[j],viewProjectionMatrix,viewportMatrix, color);
+		DrawLine(vertices[i], vertices[i + 4], viewProjectionMatrix, viewportMatrix, color);
+		DrawLine(vertices[i + 4], vertices[j + 4], viewProjectionMatrix, viewportMatrix, color);
+
+	}
+}
+
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, unsigned int color) {
 	Triangle tmp;
 	for (int i = 0; i < 3; i++) {
@@ -243,12 +274,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	Triangle triangle;
-	triangle.vertices[0] = { 0.0f,1.0f,0.0f };
-	triangle.vertices[1] = { -1.0f,0.0f,0.0f };
-	triangle.vertices[2] = { 1.0f,0.0f,0.0f };
+	AABB aabb1{
+		.min{-0.5f,-0.5f,-0.5f},
+		.max{0.0f,0.0f,0.0f},
+	};
 
-	Segment segment = { {0.0f,0.0f,0.0f},{2.0f,2.0f,0.0f} };
+	AABB aabb2{
+		.min{0.2f,0.2f,0.2f},
+		.max{1.0f,1.0f,1.0f},
+	};
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -264,13 +298,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		bool hit = IsCollision(triangle,segment);
+		bool hit = IsCollision(aabb1,aabb2);
 
 		CameraMove(cameracenterition,cameraRotate);
 
 		ImGui::Begin("window");
-		ImGui::DragFloat3("origin", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("diff", &segment.diff.x, 0.01f);
+		ImGui::DragFloat3("aabb1 min ", &aabb1.min.x, 0.01f);
+		ImGui::DragFloat3("aabb1 max ", &aabb1.max.x, 0.01f);
+		aabb1.min.x = (std::min)(aabb1.min.x, aabb1.max.x);
+		aabb1.max.x = (std::max)(aabb1.min.x, aabb1.max.x);
+		aabb1.min.y = (std::min)(aabb1.min.y, aabb1.max.y);
+		aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
+		aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
+		aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
+		ImGui::DragFloat3("aabb2 min ", &aabb2.min.x, 0.01f);
+		ImGui::DragFloat3("aabb2 max ", &aabb2.max.x, 0.01f);
+		aabb2.min.x = (std::min)(aabb2.min.x, aabb2.max.x);
+		aabb2.max.x = (std::max)(aabb2.min.x, aabb2.max.x);
+		aabb2.min.y = (std::min)(aabb2.min.y, aabb2.max.y);
+		aabb2.max.y = (std::max)(aabb2.min.y, aabb2.max.y);
+		aabb2.min.z = (std::min)(aabb2.min.z, aabb2.max.z);
+		aabb2.max.z = (std::max)(aabb2.min.z, aabb2.max.z);
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -279,15 +327,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓描画処理ここから
 		///
+		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
+
 		if (hit == true) {
-			DrawLine(segment.origin, segment.origin + segment.diff,viewMatrix * projectionMatrix, viewportMatrix, RED);
+			DrawAABB(aabb1, viewMatrix * projectionMatrix, viewportMatrix, RED);
 		}
 		else {
-			DrawLine(segment.origin, segment.origin + segment.diff, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+			DrawAABB(aabb1, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 		}
-		DrawTriangle(triangle, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+		DrawAABB(aabb2, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
-		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
 
 		///
 		/// ↑描画処理ここまで
