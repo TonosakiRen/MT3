@@ -115,6 +115,34 @@ bool IsCollision(const Sphere& sphere, const Plane& plane) {
 	return false;
 }
 
+bool IsCollision(const AABB& aabb,const Segment& segment) {
+	float txMin = (aabb.min.x - segment.origin.x) / segment.diff.x;
+	float txMax = (aabb.max.x - segment.origin.x) / segment.diff.x;
+
+	float tyMin = (aabb.min.y - segment.origin.y) / segment.diff.y;
+	float tyMax = (aabb.max.y - segment.origin.y) / segment.diff.y;
+
+	float tzMin = (aabb.min.z - segment.origin.z) / segment.diff.z;
+	float tzMax = (aabb.max.z - segment.origin.z) / segment.diff.z;
+
+	float tNearX = (std::min)(txMin, txMax);
+	float tFarX = (std::max)(txMin, txMax);
+
+	float tNearY = (std::min)(tyMin, tyMax);
+	float tFarY = (std::max)(tyMin, tyMax);
+
+	float tNearZ = (std::min)(tzMin, tzMax);
+	float tFarZ = (std::max)(tzMin, tzMax);
+
+	float tmin = (std::max)((std::max)(tNearX, tNearY), tNearZ);
+	float tmax = (std::min)((std::min)(tFarX, tFarY), tFarZ);
+
+	if (tmin <= tmax) {
+		return true;
+	}
+	return false;
+}
+
 Vector3 Perpendicular(const Vector3& vector) {
 	if (vector.x != 0.0f || vector.y != 0.0f) {
 		return { -vector.y,vector.x,0.0f };
@@ -296,10 +324,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	AABB aabb1{
 		.min{-0.5f,-0.5f,-0.5f},
-		.max{0.0f,0.0f,0.0f},
+		.max{0.5f,0.5f,0.5f},
 	};
 
-	Sphere sphere{ {0.0f,0.0f,0.0f},1.0f };
+	Segment segment{ {-0.7f,0.3f,0.0f},{2.0f,-0.5f,0.0f} };
 	
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -316,7 +344,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		bool hit = IsCollision(aabb1,sphere);
+		bool hit = IsCollision(aabb1,segment);
 
 		CameraMove(cameracenterition,cameraRotate);
 
@@ -330,8 +358,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
 		aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
 
-		ImGui::DragFloat3("sphere center ", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("sphere radius ", &sphere.radius, 0.01f);
+		ImGui::DragFloat3("segment origin ", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("segment diff", &segment.diff.x, 0.01f);
 		
 		ImGui::End();
 		///
@@ -350,7 +378,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			DrawAABB(aabb1, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 		}
 
-		DrawSphere(sphere, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+		DrawLine(segment.origin, segment.origin + segment.diff, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
 
 		///
