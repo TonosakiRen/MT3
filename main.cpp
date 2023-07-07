@@ -26,6 +26,11 @@ struct AABB {
 	Vector3 min;//最小点
 	Vector3 max;//最大点
 };
+struct OBB {
+	Vector3 center; //中心点
+	Vector3 orientations[3];//座標軸、正規化、直交座標
+	Vector3 size;//座標軸方向の長さの半分。中心から面までの距離
+};
 
 bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 	if ((aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
@@ -51,6 +56,21 @@ bool IsCollision(const AABB& aabb, const  Sphere& sphere) {
 	}
 	return false;
 }
+
+bool IsCollision(const OBB& obb, Sphere& sphere) {
+	Matrix4x4 obbWorldMatrix = { obb.orientations[0].x,obb.orientations[0].y,obb.orientations[0].z , 0.0f,
+								obb.orientations[1].x,obb.orientations[1].y,obb.orientations[1].z , 0.0f,
+								obb.orientations[2].x,obb.orientations[2].y,obb.orientations[2].z , 0.0f,
+								obb.center.x,obb.center.y, obb.center.z,1.0f };
+	Vector3 centerInOBBLocalSpace = Transform(sphere.center, Inverse(obbWorldMatrix));
+	AABB aabbOBBLocal{ .min = -obb.size,.max = obb.size };
+	Sphere sphereOBBLocal{ centerInOBBLocalSpace,
+	sphere.radius };
+	//ローカル空間で衝突判定
+	return IsCollision(aabbOBBLocal, sphereOBBLocal);
+}
+
+
 
 bool IsCollision(const Segment& segment, const Plane& plane) {
 	//まず垂直判定を行うために、法線と線の内積を求める
@@ -293,6 +313,34 @@ void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Mat
 	}
 }
 
+void DrawOBB(const OBB& obb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+	Matrix4x4 obbWorldMatrix = { obb.orientations[0].x,obb.orientations[0].y,obb.orientations[0].z , 0.0f,
+								obb.orientations[1].x,obb.orientations[1].y,obb.orientations[1].z , 0.0f,
+								obb.orientations[2].x,obb.orientations[2].y,obb.orientations[2].z , 0.0f,
+								obb.center.x,obb.center.y, obb.center.z,1.0f };
+
+	Vector3 vertices[] = { -obb.size,
+		{obb.size.x,-obb.size.y,-obb.size.z},
+		{obb.size.x,-obb.size.y,obb.size.z},
+		{-obb.size.x,-obb.size.y,obb.size.z},
+		{-obb.size.x,obb.size.y,-obb.size.z},
+		{obb.size.x,obb.size.y,-obb.size.z},
+		obb.size,
+		{-obb.size.x,obb.size.y,obb.size.z } };
+
+	for (int i = 0; i < 8; i++) {
+		vertices[i] = vertices[i] * obbWorldMatrix;
+	}
+
+	for (int i = 0; i < 4; i++) {
+		int j = (i + 1) % 4;
+		DrawLine(vertices[i], vertices[j], viewProjectionMatrix, viewportMatrix, color);
+		DrawLine(vertices[i], vertices[i + 4], viewProjectionMatrix, viewportMatrix, color);
+		DrawLine(vertices[i + 4], vertices[j + 4], viewProjectionMatrix, viewportMatrix, color);
+	}
+
+}
+
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, unsigned int color) {
 	Triangle tmp;
 	for (int i = 0; i < 3; i++) {
@@ -322,12 +370,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	AABB aabb1{
-		.min{-0.5f,-0.5f,-0.5f},
-		.max{0.5f,0.5f,0.5f},
+	OBB obb{
+		.center{-1.0f,0.0f,0.0f},
+		.orientations = 
+		{{1.0f,0.0f,0.0f},
+		 {0.0f,1.0f,0.0f},
+		 {0.0f,0.0f,1.0f}},
+		.size{0.5f,0.5f,0.5f}
 	};
+	Vector3 obbRotate{0.0f,0.0f,0.0f };
+	Matrix4x4 obbRotateMatrix = MakeRotateXMatrix(obbRotate.x) * MakeRotateYMatrix(obbRotate.y) * MakeRotateZMatrix(obbRotate.z);
 
-	Segment segment{ {-0.7f,0.3f,0.0f},{2.0f,-0.5f,0.0f} };
+	obb.orientations[0] = GetXAxis(obbRotateMatrix);
+	obb.orientations[1] = GetYAxis(obbRotateMatrix);
+	obb.orientations[2] = GetZAxis(obbRotateMatrix);
+
+	Sphere sphere{
+		.center{0.0f,0.0f,0.0f},
+		.radius{0.5f}
+	};
 	
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -344,22 +405,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 
-		bool hit = IsCollision(aabb1,segment);
+		bool hit = IsCollision(obb,sphere);
 
 		CameraMove(cameracenterition,cameraRotate);
 
 		ImGui::Begin("window");
-		ImGui::DragFloat3("aabb1 min ", &aabb1.min.x, 0.01f);
-		ImGui::DragFloat3("aabb1 max ", &aabb1.max.x, 0.01f);
-		aabb1.min.x = (std::min)(aabb1.min.x, aabb1.max.x);
-		aabb1.max.x = (std::max)(aabb1.min.x, aabb1.max.x);
-		aabb1.min.y = (std::min)(aabb1.min.y, aabb1.max.y);
-		aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
-		aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
-		aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
+		ImGui::DragFloat3("aabb1 min ", &obb.size.x, 0.01f);
+		ImGui::DragFloat3("aabb1 max ", &obbRotate.x, 0.01f);
+		obbRotateMatrix = MakeRotateXMatrix(obbRotate.x) * MakeRotateYMatrix(obbRotate.y) * MakeRotateZMatrix(obbRotate.z);
+		obb.orientations[0] = GetXAxis(obbRotateMatrix);
+		obb.orientations[1] = GetYAxis(obbRotateMatrix);
+		obb.orientations[2] = GetZAxis(obbRotateMatrix);
 
-		ImGui::DragFloat3("segment origin ", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("segment diff", &segment.diff.x, 0.01f);
+		ImGui::DragFloat3("segment origin ", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("segment diff", &sphere.radius, 0.01f);
 		
 		ImGui::End();
 		///
@@ -372,13 +431,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
 
 		if (hit == true) {
-			DrawAABB(aabb1, viewMatrix * projectionMatrix, viewportMatrix, RED);
+			DrawOBB(obb, viewMatrix * projectionMatrix, viewportMatrix, RED);
 		}
 		else {
-			DrawAABB(aabb1, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+			DrawOBB(obb, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 		}
 
-		DrawLine(segment.origin, segment.origin + segment.diff, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+		DrawSphere(sphere, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
 
 
 		///
