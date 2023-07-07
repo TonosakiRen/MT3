@@ -70,8 +70,6 @@ bool IsCollision(const OBB& obb, Sphere& sphere) {
 	return IsCollision(aabbOBBLocal, sphereOBBLocal);
 }
 
-
-
 bool IsCollision(const Segment& segment, const Plane& plane) {
 	//まず垂直判定を行うために、法線と線の内積を求める
 	float dot = Dot(plane.normal, segment.diff);
@@ -157,10 +155,29 @@ bool IsCollision(const AABB& aabb,const Segment& segment) {
 	float tmin = (std::max)((std::max)(tNearX, tNearY), tNearZ);
 	float tmax = (std::min)((std::min)(tFarX, tFarY), tFarZ);
 
-	if (tmin <= tmax) {
-		return true;
+	if (tmin > tmax) {
+		return false;
 	}
-	return false;
+	if (tmin < 0.0f && tmax < 0.0f || tmin > 1.0f && tmax > 1.0f) {
+		return false;
+	}
+	
+	return true;
+}
+
+bool IsCollision(const OBB& obb, const Segment& segment) {
+	Matrix4x4 obbWorldMatrix = { obb.orientations[0].x,obb.orientations[0].y,obb.orientations[0].z , 0.0f,
+								obb.orientations[1].x,obb.orientations[1].y,obb.orientations[1].z , 0.0f,
+								obb.orientations[2].x,obb.orientations[2].y,obb.orientations[2].z , 0.0f,
+								obb.center.x,obb.center.y, obb.center.z,1.0f };
+	Matrix4x4 obbInverseWorldMatrix = Inverse(obbWorldMatrix);
+	Vector3 obbLocalsegmentOrigin = Transform(segment.origin, obbInverseWorldMatrix);
+	Vector3 obbLocalsegmentLast = Transform(segment.origin + segment.diff, obbInverseWorldMatrix);
+	Vector3 obbLocalsegmentDiff = obbLocalsegmentLast - obbLocalsegmentOrigin;
+	AABB aabbOBBLocal{ .min = -obb.size,.max = obb.size };
+	Segment segmentOBBLocal{ .origin{obbLocalsegmentOrigin},.diff{ obbLocalsegmentDiff} };
+	//ローカル空間で衝突判定
+	return IsCollision(aabbOBBLocal, segmentOBBLocal);
 }
 
 Vector3 Perpendicular(const Vector3& vector) {
@@ -249,7 +266,7 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 		start = start * viewProjectionMatrix * viewportMatrix;
 		end = end * viewProjectionMatrix * viewportMatrix;
 		//変換した座標を使って表示。色は薄い灰色(0xAAAAAAFF)
-		if (kSubdivision / 2 + 1 == zIndex) {
+		if (kSubdivision / 2  == zIndex) {
 			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0x000000FF);
 		}
 		else {
@@ -356,16 +373,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// ライブラリの初期化
 	Novice::Initialize(kWindowTitle, kWindowWidth, kWindowHeight);
-
-	Vector3 scale = { 1.0f,1.0f,1.0f };
-	Vector3 rotate = { 0.0f,0.0f,0.0f };
-	Vector3 translate = { 0.0f,0.0f,0.0f };
 	Vector3 cameracenterition = { 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate = { 0.26f,0.0f,0.0f };
 
-	Matrix4x4 cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
+	Matrix4x4 cameraMatrix = MakeAffineMatrix({1.0f,1.0f,1.0f}, cameraRotate, cameracenterition);
 	Matrix4x4 viewMatrix = Inverse(cameraMatrix);
 	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
+	Matrix4x4 viewProjectionMatrix = viewMatrix * projectionMatrix;
 
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
@@ -385,9 +399,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	obb.orientations[1] = GetYAxis(obbRotateMatrix);
 	obb.orientations[2] = GetZAxis(obbRotateMatrix);
 
-	Sphere sphere{
-		.center{0.0f,0.0f,0.0f},
-		.radius{0.5f}
+	Segment segment{
+		.origin{-0.0f,-0.3f,0.0f},
+		.diff{0.5f,0.5f,0.5f}
 	};
 	
 
@@ -401,13 +415,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓更新処理ここから
 		///
-	
-		cameraMatrix = MakeAffineMatrix(scale, cameraRotate, cameracenterition);
+		CameraMove(cameracenterition, cameraRotate);
+		cameraMatrix = MakeAffineMatrix({1.0f,1.0f,1.0f}, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
+		viewProjectionMatrix = viewMatrix * projectionMatrix;
 
-		bool hit = IsCollision(obb,sphere);
-
-		CameraMove(cameracenterition,cameraRotate);
+		bool hit = IsCollision(obb,segment);
 
 		ImGui::Begin("window");
 		ImGui::DragFloat3("aabb1 min ", &obb.size.x, 0.01f);
@@ -417,8 +430,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		obb.orientations[1] = GetYAxis(obbRotateMatrix);
 		obb.orientations[2] = GetZAxis(obbRotateMatrix);
 
-		ImGui::DragFloat3("segment origin ", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("segment diff", &sphere.radius, 0.01f);
+		ImGui::DragFloat3("segment origin ", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("segment diff", &segment.diff.x, 0.01f);
 		
 		ImGui::End();
 		///
@@ -428,16 +441,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓描画処理ここから
 		///
-		DrawGrid(viewMatrix * projectionMatrix, viewportMatrix);
+		
+		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
 		if (hit == true) {
-			DrawOBB(obb, viewMatrix * projectionMatrix, viewportMatrix, RED);
+			DrawOBB(obb, viewProjectionMatrix, viewportMatrix, RED);
 		}
 		else {
-			DrawOBB(obb, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+			DrawOBB(obb, viewProjectionMatrix, viewportMatrix, WHITE);
 		}
 
-		DrawSphere(sphere, viewMatrix * projectionMatrix, viewportMatrix, WHITE);
+		DrawLine(segment.origin, segment.origin + segment.diff, viewProjectionMatrix, viewportMatrix, WHITE);
 
 
 		///
