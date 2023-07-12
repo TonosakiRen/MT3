@@ -70,6 +70,96 @@ bool IsCollision(const OBB& obb, Sphere& sphere) {
 	return IsCollision(aabbOBBLocal, sphereOBBLocal);
 }
 
+bool IsCollision(const OBB& obb1, const OBB& obb2) {
+	Vector3 separationAxisCandidate[15];
+	//各軸
+	separationAxisCandidate[0] = obb1.orientations[0];
+	separationAxisCandidate[1] = obb1.orientations[1];
+	separationAxisCandidate[2] = obb1.orientations[2];
+	separationAxisCandidate[3] = obb2.orientations[0];
+	separationAxisCandidate[4] = obb2.orientations[1];
+	separationAxisCandidate[5] = obb2.orientations[2];
+	//各辺のクロス積
+	separationAxisCandidate[6] = Cross(obb1.orientations[0], obb2.orientations[0]);
+	separationAxisCandidate[7] = Cross(obb1.orientations[0], obb2.orientations[1]);
+	separationAxisCandidate[8] = Cross(obb1.orientations[0], obb2.orientations[2]);
+	separationAxisCandidate[9] = Cross(obb1.orientations[1], obb2.orientations[0]);
+	separationAxisCandidate[10] = Cross(obb1.orientations[1], obb2.orientations[1]);
+	separationAxisCandidate[11] = Cross(obb1.orientations[1], obb2.orientations[2]);
+	separationAxisCandidate[12] = Cross(obb1.orientations[2], obb2.orientations[0]);
+	separationAxisCandidate[13] = Cross(obb1.orientations[2], obb2.orientations[1]);
+	separationAxisCandidate[14] = Cross(obb1.orientations[2], obb2.orientations[2]);
+	//頂点
+	Matrix4x4 obb1WorldMatrix = { obb1.orientations[0].x,obb1.orientations[0].y,obb1.orientations[0].z , 0.0f,
+								obb1.orientations[1].x,obb1.orientations[1].y,obb1.orientations[1].z , 0.0f,
+								obb1.orientations[2].x,obb1.orientations[2].y,obb1.orientations[2].z , 0.0f,
+								obb1.center.x,obb1.center.y, obb1.center.z,1.0f };
+	Matrix4x4 obb2WorldMatrix = { obb2.orientations[0].x,obb2.orientations[0].y,obb2.orientations[0].z , 0.0f,
+								obb2.orientations[1].x,obb2.orientations[1].y,obb2.orientations[1].z , 0.0f,
+								obb2.orientations[2].x,obb2.orientations[2].y,obb2.orientations[2].z , 0.0f,
+								obb2.center.x,obb2.center.y, obb2.center.z,1.0f };
+
+	Vector3 vertices1[] = { -obb1.size,
+		{obb1.size.x,-obb1.size.y,-obb1.size.z},
+		{obb1.size.x,-obb1.size.y,obb1.size.z},
+		{-obb1.size.x,-obb1.size.y,obb1.size.z},
+		{-obb1.size.x,obb1.size.y,-obb1.size.z},
+		{obb1.size.x,obb1.size.y,-obb1.size.z},
+		obb1.size,
+		{-obb1.size.x,obb1.size.y,obb1.size.z }
+	};
+
+	Vector3 vertices2[] = { -obb2.size,
+		{obb2.size.x,-obb2.size.y,-obb2.size.z},
+		{obb2.size.x,-obb2.size.y,obb2.size.z},
+		{-obb2.size.x,-obb2.size.y,obb2.size.z},
+		{-obb2.size.x,obb2.size.y,-obb2.size.z},
+		{obb2.size.x,obb2.size.y,-obb2.size.z},
+		obb2.size,
+		{-obb2.size.x,obb2.size.y,obb2.size.z }
+	};
+
+	for (int i = 0; i < 8; i++) {
+		vertices1[i] = vertices1[i] * obb1WorldMatrix;
+		vertices2[i] = vertices2[i] * obb2WorldMatrix;
+	}
+
+	//各軸
+	for (int i = 0; i < 15; i++) {
+		//影の長さの合計
+		float sumSpan;
+		//2つの影の両端の差分
+		float longSpan;
+		//射影した最大値最小値
+		float max1, min1, max2, min2;
+		//差分が形状を分離軸に射影した長さ
+		float L1, L2;
+		//すべての頂点を射影した値
+		float Dot1[8];
+		float Dot2[8];
+		//各頂点
+		for (int j = 0; j < 8; j++) {
+			Dot1[j] = Dot(separationAxisCandidate[i], vertices1[j]);
+		}
+		for (int k = 0; k < 8; k++) {
+			Dot2[k] = Dot(separationAxisCandidate[i], vertices2[k]);
+		}
+		max1 = (std::max)({ Dot1[0], Dot1[1], Dot1[3], Dot1[4], Dot1[5], Dot1[6], Dot1[7] });
+		min1 = (std::min)({ Dot1[0], Dot1[1], Dot1[3], Dot1[4], Dot1[5], Dot1[6], Dot1[7] });
+		L1 = max1 - min1;
+		max2 = (std::max)({ Dot2[0], Dot2[1], Dot2[3], Dot2[4], Dot2[5], Dot2[6], Dot2[7] });
+		min2 = (std::min)({ Dot2[0], Dot2[1], Dot2[3], Dot2[4], Dot2[5], Dot2[6], Dot2[7] });
+		L2 = max2 - min2;
+		
+		sumSpan = L1 + L2;
+		longSpan = (std::max)(max1, max2) - (std::min)(min1, min2);
+		if (sumSpan < longSpan) {
+			return false;
+		}
+	}
+	return true;
+};
+
 bool IsCollision(const Segment& segment, const Plane& plane) {
 	//まず垂直判定を行うために、法線と線の内積を求める
 	float dot = Dot(plane.normal, segment.diff);
@@ -384,25 +474,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	OBB obb{
-		.center{-1.0f,0.0f,0.0f},
-		.orientations = 
-		{{1.0f,0.0f,0.0f},
-		 {0.0f,1.0f,0.0f},
-		 {0.0f,0.0f,1.0f}},
-		.size{0.5f,0.5f,0.5f}
-	};
-	Vector3 obbRotate{0.0f,0.0f,0.0f };
-	Matrix4x4 obbRotateMatrix = MakeRotateXMatrix(obbRotate.x) * MakeRotateYMatrix(obbRotate.y) * MakeRotateZMatrix(obbRotate.z);
+	Vector3 rotate1{ 0.0f,0.0f,0.0f };
+	Vector3 rotate2{ -0.05f,2.49f,0.15f };
 
-	obb.orientations[0] = GetXAxis(obbRotateMatrix);
-	obb.orientations[1] = GetYAxis(obbRotateMatrix);
-	obb.orientations[2] = GetZAxis(obbRotateMatrix);
-
-	Segment segment{
-		.origin{-0.0f,-0.3f,0.0f},
-		.diff{0.5f,0.5f,0.5f}
+	OBB obb1{
+		.center{0.0f,0.0f,0.0f},
+		.orientations = {{1.0f,0.0f,0.0f},{0.0f,1.0f,0.0f},{0.0f,0.0f,1.0f}},
+		.size{0.83f,0.26f,0.24f}
 	};
+	OBB obb2{
+		.center{0.9f,0.66f,0.78f},
+		.orientations = {{1.0f,0.0f,0.0f},{0.0f,1.0f,0.0f},{0.0f,0.0f,1.0f}},
+		.size{0.5f,0.37f,0.5f}
+	};
+
+
 	
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -420,18 +506,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		viewMatrix = Inverse(cameraMatrix);
 		viewProjectionMatrix = viewMatrix * projectionMatrix;
 
-		bool hit = IsCollision(obb,segment);
+		bool hit = IsCollision(obb1,obb2);
 
 		ImGui::Begin("window");
-		ImGui::DragFloat3("aabb1 min ", &obb.size.x, 0.01f);
-		ImGui::DragFloat3("aabb1 max ", &obbRotate.x, 0.01f);
-		obbRotateMatrix = MakeRotateXMatrix(obbRotate.x) * MakeRotateYMatrix(obbRotate.y) * MakeRotateZMatrix(obbRotate.z);
-		obb.orientations[0] = GetXAxis(obbRotateMatrix);
-		obb.orientations[1] = GetYAxis(obbRotateMatrix);
-		obb.orientations[2] = GetZAxis(obbRotateMatrix);
+		ImGui::DragFloat3("obb1 size ", &obb1.size.x, 0.01f);
+		ImGui::DragFloat3("obb1 rotate ", &rotate1.x, 0.01f);
+		ImGui::DragFloat3("obb1 center ", &obb1.center.x, 0.01f);
+		ImGui::DragFloat3("obb2 size ", &obb2.size.x, 0.01f);
+		ImGui::DragFloat3("obb2 rotate ", &rotate2.x, 0.01f);
+		ImGui::DragFloat3("obb2 center ", &obb2.center.x, 0.01f);
 
-		ImGui::DragFloat3("segment origin ", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("segment diff", &segment.diff.x, 0.01f);
+		Matrix4x4 rotate1Matrix = MakeRotateXMatrix(rotate1.x) * MakeRotateYMatrix(rotate1.y) * MakeRotateZMatrix(rotate1.z);
+		Matrix4x4 rotate2Matrix = MakeRotateXMatrix(rotate2.x) * MakeRotateYMatrix(rotate2.y) * MakeRotateZMatrix(rotate2.z);
+		obb1.orientations[0] = GetXAxis(rotate1Matrix);
+		obb1.orientations[1] = GetYAxis(rotate1Matrix);
+		obb1.orientations[2] = GetZAxis(rotate1Matrix);
+		obb2.orientations[0] = GetXAxis(rotate2Matrix);
+		obb2.orientations[1] = GetYAxis(rotate2Matrix);
+		obb2.orientations[2] = GetZAxis(rotate2Matrix);
 		
 		ImGui::End();
 		///
@@ -445,13 +537,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
 		if (hit == true) {
-			DrawOBB(obb, viewProjectionMatrix, viewportMatrix, RED);
+			DrawOBB(obb1, viewProjectionMatrix, viewportMatrix, RED);
 		}
 		else {
-			DrawOBB(obb, viewProjectionMatrix, viewportMatrix, WHITE);
+			DrawOBB(obb1, viewProjectionMatrix, viewportMatrix, WHITE);
 		}
 
-		DrawLine(segment.origin, segment.origin + segment.diff, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawOBB(obb2, viewProjectionMatrix, viewportMatrix, WHITE);
 
 
 		///
