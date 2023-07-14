@@ -458,6 +458,38 @@ void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatri
 	Novice::DrawLine(int(tmp.vertices[2].x), int(tmp.vertices[2].y), int(tmp.vertices[0].x), int(tmp.vertices[0].y), color);
 }
 
+float easing(float t, float start, float end) {
+
+	return((1.0f - t) * start + t * end);
+}
+
+Vector3 Leap(float t, const Vector3& v1, const Vector3& v2) {
+	Vector3 result;
+	result.x = easing(t, v1.x, v2.x);
+	result.y = easing(t, v1.y, v2.y);
+	result.z = easing(t, v1.z, v2.z);
+	return result;
+}
+
+Vector3 Bezier(const Vector3& v1, const Vector3& v2, const Vector3& v3, float t) {
+	Vector3 tmp0 = Leap(t, v1, v2);
+	Vector3 tmp1 = Leap(t, v2, v3);
+	Vector3 tmp = Leap(t, tmp0, tmp1);
+	return tmp;
+}
+
+const int DivisionNum = 200;
+
+void DrawBezier(const Vector3& controllPoint0, const Vector3& controllPoint1, const Vector3& controllPoint2, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+	for (int index = 0; index < DivisionNum; index++) {
+		float t0 = index / float(DivisionNum);
+		float t1 = (index + 1) / float(DivisionNum);
+		Vector3 start = Bezier(controllPoint0, controllPoint1, controllPoint2, t0);
+		Vector3 end = Bezier(controllPoint0, controllPoint1, controllPoint2, t1);
+		DrawLine(start, end, viewProjectionMatrix, viewportMatrix, color);
+	}
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -474,18 +506,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	Vector3 rotate1{ 0.0f,0.0f,0.0f };
-	Vector3 rotate2{ -0.05f,2.49f,0.15f };
-
-	OBB obb1{
-		.center{0.0f,0.0f,0.0f},
-		.orientations = {{1.0f,0.0f,0.0f},{0.0f,1.0f,0.0f},{0.0f,0.0f,1.0f}},
-		.size{0.83f,0.26f,0.24f}
-	};
-	OBB obb2{
-		.center{0.9f,0.66f,0.78f},
-		.orientations = {{1.0f,0.0f,0.0f},{0.0f,1.0f,0.0f},{0.0f,0.0f,1.0f}},
-		.size{0.5f,0.37f,0.5f}
+	Vector3 controlPoints[3] = {
+		{-0.0f,0.50f,1.0f},
+		{1.76f,1.0f,-3.0f},
+		{0.94f,-0.7f,2.3f},
 	};
 
 
@@ -506,25 +530,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		viewMatrix = Inverse(cameraMatrix);
 		viewProjectionMatrix = viewMatrix * projectionMatrix;
 
-		bool hit = IsCollision(obb1,obb2);
+	
 
 		ImGui::Begin("window");
-		ImGui::DragFloat3("obb1 size ", &obb1.size.x, 0.01f);
-		ImGui::DragFloat3("obb1 rotate ", &rotate1.x, 0.01f);
-		ImGui::DragFloat3("obb1 center ", &obb1.center.x, 0.01f);
-		ImGui::DragFloat3("obb2 size ", &obb2.size.x, 0.01f);
-		ImGui::DragFloat3("obb2 rotate ", &rotate2.x, 0.01f);
-		ImGui::DragFloat3("obb2 center ", &obb2.center.x, 0.01f);
-
-		Matrix4x4 rotate1Matrix = MakeRotateXMatrix(rotate1.x) * MakeRotateYMatrix(rotate1.y) * MakeRotateZMatrix(rotate1.z);
-		Matrix4x4 rotate2Matrix = MakeRotateXMatrix(rotate2.x) * MakeRotateYMatrix(rotate2.y) * MakeRotateZMatrix(rotate2.z);
-		obb1.orientations[0] = GetXAxis(rotate1Matrix);
-		obb1.orientations[1] = GetYAxis(rotate1Matrix);
-		obb1.orientations[2] = GetZAxis(rotate1Matrix);
-		obb2.orientations[0] = GetXAxis(rotate2Matrix);
-		obb2.orientations[1] = GetYAxis(rotate2Matrix);
-		obb2.orientations[2] = GetZAxis(rotate2Matrix);
-		
+		ImGui::DragFloat3("0", &controlPoints[0].x, 0.01f);
+		ImGui::DragFloat3("1", &controlPoints[1].x, 0.01f);
+		ImGui::DragFloat3("2", &controlPoints[2].x, 0.01f);
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -536,14 +547,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if (hit == true) {
-			DrawOBB(obb1, viewProjectionMatrix, viewportMatrix, RED);
-		}
-		else {
-			DrawOBB(obb1, viewProjectionMatrix, viewportMatrix, WHITE);
-		}
-
-		DrawOBB(obb2, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawBezier(controlPoints[0], controlPoints[1], controlPoints[2], viewProjectionMatrix, viewportMatrix,BLUE);
 
 
 		///
