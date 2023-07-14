@@ -490,6 +490,70 @@ void DrawBezier(const Vector3& controllPoint0, const Vector3& controllPoint1, co
 	}
 }
 
+Vector3 CatmullRomEasing(const std::vector<Vector3>& controlPoints, float t) {
+	//制御点の数
+	int numPoints = static_cast<int>(controlPoints.size());
+	//tの範囲を制限
+	t = std::clamp(t, 0.0f, 1.0f);
+	//tを使用してどのセグメントに属するかを計算する
+	float segment = t * (numPoints - 1);
+	//セグメントの整数部分と小数部分を分離する
+	int segmentIndex = static_cast<int>(std::floor(segment));
+	float segmentFraction = segment - segmentIndex;
+
+	//制御点のインデックスを計算する
+	int p0 = (segmentIndex - 1 + numPoints) % numPoints;
+	if (segmentIndex == 0) {
+		p0 = 0;
+	}
+	int p1 = (segmentIndex + numPoints) % numPoints;
+	int p2 = (segmentIndex + 1 + numPoints) % numPoints;
+	int p3 = (segmentIndex + 2 + numPoints) % numPoints;
+	if (segmentIndex == numPoints - 2 || segmentIndex == numPoints - 1) {
+		p3 = numPoints - 1;
+	}
+
+	//セグメントにおける補間の重みを計算する
+
+	float segmentFraction2 = segmentFraction * segmentFraction;
+	float segmentFraction3 = segmentFraction2 * segmentFraction;
+
+
+	float t0 = -segmentFraction3 + 2.0f * segmentFraction2 - segmentFraction;
+	float t1 = 3.0f * segmentFraction3 - 5.0f * segmentFraction2 + 2.0f; 
+	float t2 = -3.0f * segmentFraction3 + 4.0f * segmentFraction2 + segmentFraction;
+	float t3 = segmentFraction3 - segmentFraction2;
+
+	 // Catmull-Romスプラインの線形補間を計算する
+	Vector3 interpolatedPoint;
+	interpolatedPoint.x = (t0 * controlPoints[p0].x + t1 * controlPoints[p1].x + t2 * controlPoints[p2].x + t3 * controlPoints[p3].x)  * 0.5f;
+	interpolatedPoint.y = (t0 * controlPoints[p0].y + t1 * controlPoints[p1].y + t2 * controlPoints[p2].y + t3 * controlPoints[p3].y)  * 0.5f;
+	interpolatedPoint.z = (t0 * controlPoints[p0].z + t1 * controlPoints[p1].z + t2 * controlPoints[p2].z + t3 * controlPoints[p3].z)  * 0.5f;
+
+	return interpolatedPoint;
+
+	/*Vector3 interpolatedPoint;
+
+	interpolatedPoint = 0.5f * (((-controlPoints[p0] + 3.0f * controlPoints[p1] - 3.0f * controlPoints[p2] + controlPoints[p3]) * segmentFraction3) +
+		((2.0f * controlPoints[p0] - 5.0f * controlPoints[p1] + 4.0f * controlPoints[2] - controlPoints[p3]) * segmentFraction2) +
+		((-controlPoints[p0] + controlPoints[p2]) * segmentFraction) + 2.0f * controlPoints[p1]);
+
+	return interpolatedPoint;*/
+}
+
+void DrawCatmullRomSpline(const std::vector<Vector3>& controlPoints, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+	std::vector<Vector3> points_;
+	for (size_t i = 0; i < DivisionNum + 1; i++) {
+		float t = 1.0f / DivisionNum * i;
+		Vector3 pos = CatmullRomEasing(controlPoints, t);
+		// 描画用頂点リストに追加
+		points_.push_back(pos);
+	}
+	for (int i = 0; i < DivisionNum; i++) {
+		DrawLine(points_[i], points_[i + 1], viewProjectionMatrix, viewportMatrix, color);
+	}
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -506,14 +570,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	Vector3 controlPoints[3] = {
-		{-0.0f,0.50f,1.0f},
+
+	std::vector<Vector3> controlPoints = {
+		{ -0.8f,0.58f,1.0f},
 		{1.76f,1.0f,-3.0f},
 		{0.94f,-0.7f,2.3f},
+		{-0.53f,-0.26f,-0.15f}
 	};
-
-
-	
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -530,12 +593,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		viewMatrix = Inverse(cameraMatrix);
 		viewProjectionMatrix = viewMatrix * projectionMatrix;
 
-	
-
 		ImGui::Begin("window");
 		ImGui::DragFloat3("0", &controlPoints[0].x, 0.01f);
 		ImGui::DragFloat3("1", &controlPoints[1].x, 0.01f);
 		ImGui::DragFloat3("2", &controlPoints[2].x, 0.01f);
+		ImGui::DragFloat3("3", &controlPoints[3].x, 0.01f);
 		ImGui::End();
 		///
 		/// ↑更新処理ここまで
@@ -547,8 +609,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		DrawBezier(controlPoints[0], controlPoints[1], controlPoints[2], viewProjectionMatrix, viewportMatrix,BLUE);
-
+		DrawCatmullRomSpline(controlPoints, viewProjectionMatrix, viewportMatrix,BLUE);
+		for (int i = 0; i < controlPoints.size(); i++) {
+			DrawSphere({ controlPoints[i],0.01f }, viewProjectionMatrix, viewportMatrix, BLACK);
+		}
 
 		///
 		/// ↑描画処理ここまで
