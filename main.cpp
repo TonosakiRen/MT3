@@ -585,24 +585,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	Object sholder = {
-		.scale = {1.0f,1.0f,1.0f},
-		.rotate = {0.0f,0.0f,-6.8f},
-		.transform = {0.2f,1.0f,0.0f}
-	};
-	Object elbow = {
-		.scale = {1.0f,1.0f,1.0f},
-		.rotate = {0.0f,0.0f,-1.4f},
-		.transform = {0.4f,0.0f,0.0f},
-		.parent = &sholder.worldTransform
-	};
-	Object hand = { 
-		.scale = {1.0f,1.0f,1.0f},
-		.rotate = {0.0f,0.0f,0.0f},
-		.transform = {0.3f,1.0f,0.0f},
-		.parent = &elbow.worldTransform
-	};
-	
+	Vector3 a{ 0.2f,1.0f,0.0f };
+	Vector3 b{ 2.4f,3.1f,1.2f };
+	Vector3 c = a + b;
+	Vector3 d = a - b;
+	Vector3 e = a * 2.4f;
+	Vector3 rotate{ 0.4f,1.43f,-0.8f };
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
 	
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -620,18 +612,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		viewProjectionMatrix = viewMatrix * projectionMatrix;
 
 		ImGui::Begin("window");
-		ImGui::DragFloat3("sholder", &sholder.transform.x,0.01f);
-		ImGui::DragFloat3("sholderRotate", &sholder.rotate.x, 0.01f);
-		ImGui::DragFloat3("elbow", &elbow.transform.x, 0.01f);
-		ImGui::DragFloat3("elbowRotate", &elbow.rotate.x, 0.01f);
-		ImGui::DragFloat3("hand", &hand.transform.x, 0.01f);
-		ImGui::DragFloat3("handRotate", &hand.rotate.x, 0.01f);
+		ImGui::Text("c:%f,%f,%f", c.x, c.y, c.z);
+		ImGui::Text("d:%f,%f,%f", d.x, d.y, d.z);
+		ImGui::Text("e:%f,%f,%f", e.x, e.y, e.z);
+		ImGui::Text("matrix:\n%f,%f,%f,%f\n%f,%f,%f,%f\n%f,%f,%f,%f\n%f,%f,%f,%f\n",
+			rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2],
+			rotateMatrix.m[0][3], rotateMatrix.m[1][0], rotateMatrix.m[1][1],
+			rotateMatrix.m[1][2], rotateMatrix.m[1][3], rotateMatrix.m[2][0],
+			rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
+			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2],
+			rotateMatrix.m[3][3]);
 		ImGui::End();
 
 
-		sholder.UpdateWorldTransform();
-		elbow.UpdateWorldTransform();
-		hand.UpdateWorldTransform();
+		
 		///
 		/// ↑更新処理ここまで
 		///
@@ -641,11 +635,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawSphere(sholder.model, viewProjectionMatrix, viewportMatrix, RED);
-		DrawLine(sholder.model.center, elbow.model.center, viewProjectionMatrix, viewportMatrix,WHITE);
-		DrawSphere(elbow.model, viewProjectionMatrix, viewportMatrix, GREEN);
-		DrawLine(elbow.model.center, hand.model.center, viewProjectionMatrix, viewportMatrix, WHITE);
-		DrawSphere(hand.model, viewProjectionMatrix, viewportMatrix, BLUE);
 
 		///
 		/// ↑描画処理ここまで
