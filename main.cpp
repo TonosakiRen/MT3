@@ -6,6 +6,7 @@
 #include <imgui.h>
 #include <Input.h>
 #include <algorithm>
+#include <numbers>
 const char kWindowTitle[] = "学籍番号";
 const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
@@ -604,19 +605,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	float deltTime = 1.0f / 60.0f;
 
-	Spring spring{};
-	spring.anchor = { 0.0f,1.0f,0.0f };
-	spring.naturalLength = 0.7f;
-	spring.stiffness = 100.0f;
-	spring.dampingCoefficient = 2.0f;
-
+	float r = 1.0f;
+	
 	Ball ball{};
-	ball.position = { 0.8f,0.2f,0.0f };
+	ball.position = { r,0.0f,0.0f };
 	ball.mass = 2.0f;
 	ball.radius = 0.05f;
 	ball.color = BLUE;
 	const Vector3 kGravity{ 0.0f,-9.8f,0.0f };
 
+	float angularVelocity = std::numbers::pi_v<float>;
+	float angle = 0.0f;
+	Vector3 c = {0.0f,0.0f,0.0f};
 
 	bool start = false;
 	
@@ -640,19 +640,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//ゲームの処理
 
 		if (start) {
-			Vector3 diff = ball.position - spring.anchor;
-			float length = Length(diff);
-			if (length != 0.0f) {
-				Vector3 direction = Normalize(diff);
-				Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
-				Vector3 displacement = length * (ball.position - restPosition);
-				Vector3 restoreingForce = -spring.stiffness * displacement;
-				Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
-				Vector3 force = restoreingForce + dampingForce;
-				ball.accelertion = force  / ball.mass + kGravity;
-			}
-			ball.velocity += ball.accelertion * deltTime;
-			ball.position += ball.velocity * deltTime;
+			
+			angle += angularVelocity * deltTime;
+			ball.position.x = c.x + std::cosf(angle) * r;
+			ball.position.y = c.y + std::sinf(angle) * r;
+			ball.position.z = c.z;
 		}
 
 		//
@@ -671,7 +663,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawLine(spring.anchor, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawLine(Vector3{0.0f,0.0f,0.0f}, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
 		DrawSphere({ ball.position,ball.radius }, viewProjectionMatrix, viewportMatrix, BLUE);
 
 
