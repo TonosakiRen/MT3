@@ -605,16 +605,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	float deltTime = 1.0f / 60.0f;
 
 	Spring spring{};
-	spring.anchor = { 0.0f,0.0f,0.0f };
-	spring.naturalLength = 1.0f;
+	spring.anchor = { 0.0f,1.0f,0.0f };
+	spring.naturalLength = 0.7f;
 	spring.stiffness = 100.0f;
 	spring.dampingCoefficient = 2.0f;
 
 	Ball ball{};
-	ball.position = { 1.2f,0.0f,0.0f };
+	ball.position = { 0.8f,0.2f,0.0f };
 	ball.mass = 2.0f;
 	ball.radius = 0.05f;
 	ball.color = BLUE;
+	const Vector3 kGravity{ 0.0f,-9.8f,0.0f };
+
 
 	bool start = false;
 	
@@ -647,7 +649,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				Vector3 restoreingForce = -spring.stiffness * displacement;
 				Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
 				Vector3 force = restoreingForce + dampingForce;
-				ball.accelertion = force / ball.mass;
+				ball.accelertion = force  / ball.mass + kGravity;
 			}
 			ball.velocity += ball.accelertion * deltTime;
 			ball.position += ball.velocity * deltTime;
@@ -669,7 +671,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawLine({ 0.0f,0.0f,0.0f }, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawLine(spring.anchor, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
 		DrawSphere({ ball.position,ball.radius }, viewProjectionMatrix, viewportMatrix, BLUE);
 
 
