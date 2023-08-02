@@ -33,6 +33,14 @@ struct OBB {
 	Vector3 size;//座標軸方向の長さの半分。中心から面までの距離
 };
 
+struct Pendulum {
+	Vector3 anchor; //アンカーポイント。固定された端の位置
+	float length;	//紐の長さ
+	float angle;	//現在の角度
+	float angularVelocity;	//各深度
+	float angularAcceleration;//各加速度
+};
+
 bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 	if ((aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
 		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
@@ -614,11 +622,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ball.color = BLUE;
 	const Vector3 kGravity{ 0.0f,-9.8f,0.0f };
 
-	float angularVelocity = std::numbers::pi_v<float>;
-	float angle = 0.0f;
-	Vector3 c = {0.0f,0.0f,0.0f};
+	Pendulum pendulum;
+	pendulum.anchor = {0.0f,1.0f,0.0f};
+	pendulum.length = 0.8f;
+	pendulum.angle = 0.7f;
+	pendulum.angularVelocity = 0.0f;
+	pendulum.angularAcceleration = 0.0f;
 
 	bool start = false;
+
+
 	
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -641,10 +654,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		if (start) {
 			
-			angle += angularVelocity * deltTime;
-			ball.position.x = c.x + std::cosf(angle) * r;
-			ball.position.y = c.y + std::sinf(angle) * r;
-			ball.position.z = c.z;
+			pendulum.angularAcceleration = -(9.8f / pendulum.length) * std::sin(pendulum.angle);
+			pendulum.angularVelocity += pendulum.angularAcceleration * deltTime;
+			pendulum.angle += pendulum.angularVelocity * deltTime;
+
+			//pは振子の先頭の位置。取り付けたいものを取り付ければ良い。
+			ball.position.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
+			ball.position.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
+			ball.position.z = pendulum.anchor.z ;
 		}
 
 		//
@@ -663,7 +680,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawLine(Vector3{0.0f,0.0f,0.0f}, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawLine(pendulum.anchor, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
 		DrawSphere({ ball.position,ball.radius }, viewProjectionMatrix, viewportMatrix, BLUE);
 
 
