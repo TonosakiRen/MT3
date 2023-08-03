@@ -49,6 +49,11 @@ struct ConicalPendulum {
 	float angularVelocity;	//角速度w
 };
 
+Vector3 Reflect(const Vector3& input, const Vector3 normal) {
+	Vector3 result = input - 2.0f * Dot(input, normal) * normal;
+	return result;
+}
+
 bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 	if ((aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
 		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
@@ -621,21 +626,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	float deltTime = 1.0f / 60.0f;
 
-	float r = 1.0f;
+	
 	
 	Ball ball{};
-	ball.position = { r,0.0f,0.0f };
+	ball.position = { 0.8f,1.2f,0.3f };
 	ball.mass = 2.0f;
 	ball.radius = 0.05f;
-	ball.color = BLUE;
+	ball.color = WHITE;
 	const Vector3 kGravity{ 0.0f,-9.8f,0.0f };
+	ball.accelertion = kGravity;
 
-	ConicalPendulum conicalPendulum;
-	conicalPendulum.anchor = {0.0f,1.0f,0.0f};
-	conicalPendulum.length = 0.8f;
-	conicalPendulum.halfApexAngle = 0.7f;
-	conicalPendulum.angle = 0.0f;
-	conicalPendulum.angularVelocity = 0.0f;
+	Plane plane;
+	plane.normal = Normalize({-0.2f,0.9f,-0.3f});
+	plane.distance = 0.0f;
+
+	
+	struct Capsule {
+		Segment segment;
+		float radius;
+	};
+
+	float e = 0.8f;
 
 	bool start = false;
 
@@ -661,15 +672,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//ゲームの処理
 
 		if (start) {
-			conicalPendulum.angularVelocity = std::sqrt(9.8f / (conicalPendulum.length * std::cos(conicalPendulum.halfApexAngle)));
-			conicalPendulum.angle += conicalPendulum.angularVelocity * deltTime;
-
-			float radius = std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
-			float height = std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length;
-
-			ball.position.x = conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius;
-			ball.position.y = conicalPendulum.anchor.y - height;
-			ball.position.z = conicalPendulum.anchor.z - std::sin(conicalPendulum.angle) * radius;
+			ball.velocity += ball.accelertion * deltTime;
+			ball.position += ball.velocity * deltTime;
+			if (IsCollision(Sphere{ ball.position,ball.radius },plane)) {
+				ball.velocity = Reflect(ball.velocity, plane.normal) * e;
+			}
 		}
 
 		//
@@ -688,7 +695,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawLine(conicalPendulum.anchor, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
 		DrawSphere({ ball.position,ball.radius }, viewProjectionMatrix, viewportMatrix, BLUE);
 
 
