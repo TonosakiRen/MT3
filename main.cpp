@@ -41,6 +41,14 @@ struct Pendulum {
 	float angularAcceleration;//各加速度
 };
 
+struct ConicalPendulum {
+	Vector3 anchor;			//アンカーポイント
+	float length;			//紐の長さ
+	float halfApexAngle;	//円錐の頂点の半分
+	float angle;			//現在の角度
+	float angularVelocity;	//角速度w
+};
+
 bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 	if ((aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
 		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
@@ -622,12 +630,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ball.color = BLUE;
 	const Vector3 kGravity{ 0.0f,-9.8f,0.0f };
 
-	Pendulum pendulum;
-	pendulum.anchor = {0.0f,1.0f,0.0f};
-	pendulum.length = 0.8f;
-	pendulum.angle = 0.7f;
-	pendulum.angularVelocity = 0.0f;
-	pendulum.angularAcceleration = 0.0f;
+	ConicalPendulum conicalPendulum;
+	conicalPendulum.anchor = {0.0f,1.0f,0.0f};
+	conicalPendulum.length = 0.8f;
+	conicalPendulum.halfApexAngle = 0.7f;
+	conicalPendulum.angle = 0.0f;
+	conicalPendulum.angularVelocity = 0.0f;
 
 	bool start = false;
 
@@ -653,15 +661,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//ゲームの処理
 
 		if (start) {
-			
-			pendulum.angularAcceleration = -(9.8f / pendulum.length) * std::sin(pendulum.angle);
-			pendulum.angularVelocity += pendulum.angularAcceleration * deltTime;
-			pendulum.angle += pendulum.angularVelocity * deltTime;
+			conicalPendulum.angularVelocity = std::sqrt(9.8f / (conicalPendulum.length * std::cos(conicalPendulum.halfApexAngle)));
+			conicalPendulum.angle += conicalPendulum.angularVelocity * deltTime;
 
-			//pは振子の先頭の位置。取り付けたいものを取り付ければ良い。
-			ball.position.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
-			ball.position.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
-			ball.position.z = pendulum.anchor.z ;
+			float radius = std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
+			float height = std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length;
+
+			ball.position.x = conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius;
+			ball.position.y = conicalPendulum.anchor.y - height;
+			ball.position.z = conicalPendulum.anchor.z - std::sin(conicalPendulum.angle) * radius;
 		}
 
 		//
@@ -680,7 +688,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawLine(pendulum.anchor, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawLine(conicalPendulum.anchor, ball.position, viewProjectionMatrix, viewportMatrix, WHITE);
 		DrawSphere({ ball.position,ball.radius }, viewProjectionMatrix, viewportMatrix, BLUE);
 
 
