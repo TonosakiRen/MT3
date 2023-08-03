@@ -182,7 +182,7 @@ bool IsCollision(const OBB& obb1, const OBB& obb2) {
 	return true;
 };
 
-bool IsCollision(const Segment& segment, const Plane& plane) {
+bool IsCollision(const Segment& segment, const Plane& plane , Vector3& interSectionPoint) {
 	//まず垂直判定を行うために、法線と線の内積を求める
 	float dot = Dot(plane.normal, segment.diff);
 	//垂直 = 並行で絵あるので、衝突しているはずがない
@@ -192,6 +192,7 @@ bool IsCollision(const Segment& segment, const Plane& plane) {
 	//tを求める
 	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
 	if (t >= 0.0f && t <= 1.0f) {
+		interSectionPoint = segment.origin + t * segment.diff;
 		return true;
 	}
 	return false;
@@ -244,6 +245,7 @@ bool IsCollision(const Sphere& sphere, const Plane& plane) {
 	}
 	return false;
 }
+
 
 bool IsCollision(const AABB& aabb,const Segment& segment) {
 	float txMin = (aabb.min.x - segment.origin.x) / segment.diff.x;
@@ -636,15 +638,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const Vector3 kGravity{ 0.0f,-9.8f,0.0f };
 	ball.accelertion = kGravity;
 
-	Plane plane;
-	plane.normal = Normalize({-0.2f,0.9f,-0.3f});
-	plane.distance = 0.0f;
-
-	
 	struct Capsule {
 		Segment segment;
 		float radius;
 	};
+
+	Capsule capsule;
+	capsule.radius = ball.radius;
+	capsule.segment = {0.0f,0.0f,0.0f};
+
+	Plane plane;
+	plane.normal = Normalize({-0.2f,0.9f,-0.3f});
+	plane.distance = 0.0f;
+
 
 	float e = 0.8f;
 
@@ -672,12 +678,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//ゲームの処理
 
 		if (start) {
+			Vector3 prePosition = ball.position;
 			ball.velocity += ball.accelertion * deltTime;
 			ball.position += ball.velocity * deltTime;
-			if (IsCollision(Sphere{ ball.position,ball.radius },plane)) {
+
+			capsule = { { prePosition,ball.position - prePosition }, ball.radius };
+			Segment closestSegemnt = { capsule.segment.origin - plane.normal * capsule.radius,capsule.segment.diff };
+
+			Vector3 intersectPoint{};
+			if (IsCollision( closestSegemnt, plane, intersectPoint)) {
+				ball.position = intersectPoint + plane.normal * (capsule.radius + 0.0001f);
 				ball.velocity = Reflect(ball.velocity, plane.normal) * e;
 			}
+
 		}
+			
+			
 
 		//
 		//ImGui
