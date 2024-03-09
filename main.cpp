@@ -503,6 +503,13 @@ void DrawOBB(const OBB& obb, const Matrix4x4& viewProjectionMatrix, const Matrix
 
 }
 
+void DrawFrustum(const Frustum& frustum, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+	for (int i = 0; i < 6; i++) {
+		DrawPlane(frustum.plane[i], viewProjectionMatrix, viewportMatrix, color);
+	}
+}
+
+
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, unsigned int color) {
 	Triangle tmp;
 	for (int i = 0; i < 3; i++) {
