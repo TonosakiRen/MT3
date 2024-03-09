@@ -21,6 +21,11 @@ struct Segment {
 	Vector3 diff;//終点への差分ベクトル
 };
 
+struct Frustum {
+	Plane plane[6]{};
+	Vector3 vertex[8]{};
+};
+
 #pragma region Vector3
 
 Vector3 GetXAxis(Matrix4x4 m){

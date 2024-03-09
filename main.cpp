@@ -197,6 +197,37 @@ bool IsCollision(const Segment& segment, const Plane& plane , Vector3& interSect
 	}
 	return false;
 }
+
+bool IsCollision(const Ray& ray, const Plane& plane, Vector3& interSectionPoint) {
+	//まず垂直判定を行うために、法線と線の内積を求める
+	float dot = Dot(plane.normal, ray.diff);
+	//垂直 = 並行で絵あるので、衝突しているはずがない
+	if (dot == 0.0f) {
+		return false;
+	}
+	//tを求める
+	float t = (plane.distance - Dot(ray.origin, plane.normal)) / dot;
+	if (t <= 0.0f) {
+		interSectionPoint = ray.origin + t * ray.diff;
+		return true;
+	}
+	return false;
+}
+
+bool IsCollision(const Line& line, const Plane& plane, Vector3& interSectionPoint) {
+	//まず垂直判定を行うために、法線と線の内積を求める
+	float dot = Dot(plane.normal, line.diff);
+	//垂直 = 並行で絵あるので、衝突しているはずがない
+	if (dot == 0.0f) {
+		return false;
+	}
+	//tを求める
+	float t = (plane.distance - Dot(line.origin, plane.normal)) / dot;
+	interSectionPoint = line.origin + t * line.diff;
+		
+	return true;
+}
+
 Vector3 Normal(const Vector3& a,const Vector3& b, const Vector3 c) {
 	return Normalize(Cross(b - a, c - b));
 }
