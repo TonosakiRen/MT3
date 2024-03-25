@@ -293,7 +293,7 @@ bool IsCollision(const Frustum& frustum, const Sphere& sphere) {
 	int hitNum = 0;
 	//平面の法線と内積をとる
 	for (int i = 0; i < 6; i++) {
-		//プラスであれば外側距離を測ってreturn,内側の場合マイナス
+		//プラスであれば外側距離を測る,内側の場合マイナス
 		float a = Dot(frustum.plane[i].normal, sphere.center) - frustum.plane[i].distance;
 		if (a < 0.0f) {
 			hitNum++;
