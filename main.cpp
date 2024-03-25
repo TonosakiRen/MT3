@@ -12,43 +12,6 @@ const int kWindowWidth = 1280;
 const int kWindowHeight = 720;
 
 
-struct Plane {
-	Vector3 normal;//法線
-	float distance;//距離
-};
-struct Sphere {
-	Vector3 center; // 中心点
-	float radius; //半径
-};
-struct Triangle {
-	Vector3 vertices[3];
-};
-struct AABB {
-	Vector3 min;//最小点
-	Vector3 max;//最大点
-};
-struct OBB {
-	Vector3 center; //中心点
-	Vector3 orientations[3];//座標軸、正規化、直交座標
-	Vector3 size;//座標軸方向の長さの半分。中心から面までの距離
-};
-
-struct Pendulum {
-	Vector3 anchor; //アンカーポイント。固定された端の位置
-	float length;	//紐の長さ
-	float angle;	//現在の角度
-	float angularVelocity;	//各深度
-	float angularAcceleration;//各加速度
-};
-
-struct ConicalPendulum {
-	Vector3 anchor;			//アンカーポイント
-	float length;			//紐の長さ
-	float halfApexAngle;	//円錐の頂点の半分
-	float angle;			//現在の角度
-	float angularVelocity;	//角速度w
-};
-
 Vector3 Reflect(const Vector3& input, const Vector3 normal) {
 	Vector3 result = input - 2.0f * Dot(input, normal) * normal;
 	return result;
@@ -325,6 +288,30 @@ bool IsCollision(const OBB& obb, const Segment& segment) {
 	return IsCollision(aabbOBBLocal, segmentOBBLocal);
 }
 
+bool IsCollision(const Frustum& frustum, const Sphere& sphere) {
+
+	int hitNum = 0;
+	//平面の法線と内積をとる
+	for (int i = 0; i < 6; i++) {
+		//プラスであれば外側距離を測ってreturn,内側の場合マイナス
+		float a = Dot(frustum.plane[i].normal, sphere.center) - frustum.plane[i].distance;
+		if (a < 0.0f) {
+			hitNum++;
+		}
+		else {
+			if (std::abs(a) < sphere.radius) {
+				hitNum++;
+			}
+		}
+	}
+
+	if (hitNum == 6) {
+		return true;
+	}
+
+	return false;
+}
+
 Vector3 Perpendicular(const Vector3& vector) {
 	if (vector.x != 0.0f || vector.y != 0.0f) {
 		return { -vector.y,vector.x,0.0f };
@@ -504,11 +491,22 @@ void DrawOBB(const OBB& obb, const Matrix4x4& viewProjectionMatrix, const Matrix
 }
 
 void DrawFrustum(const Frustum& frustum, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
-	for (int i = 0; i < 6; i++) {
-		DrawPlane(frustum.plane[i], viewProjectionMatrix, viewportMatrix, color);
-	}
-}
+	DrawLine(frustum.vertex[0], frustum.vertex[1], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[0], frustum.vertex[2], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[2], frustum.vertex[3], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[3], frustum.vertex[1], viewProjectionMatrix, viewportMatrix, color);
 
+	DrawLine(frustum.vertex[4], frustum.vertex[5], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[4], frustum.vertex[6], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[6], frustum.vertex[7], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[7], frustum.vertex[5], viewProjectionMatrix, viewportMatrix, color);
+
+	DrawLine(frustum.vertex[0], frustum.vertex[4], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[1], frustum.vertex[5], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[2], frustum.vertex[6], viewProjectionMatrix, viewportMatrix, color);
+	DrawLine(frustum.vertex[3], frustum.vertex[7], viewProjectionMatrix, viewportMatrix, color);
+
+}
 
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, unsigned int color) {
 	Triangle tmp;
@@ -648,6 +646,58 @@ struct Ball {
 	unsigned int color;//ボールの色
 };
 
+Frustum frustum;
+
+static const uint32_t kTileWidthNum = 16;
+static const uint32_t kTileHeightNum = 9;
+static const uint32_t kTileNum = kTileWidthNum * kTileHeightNum;
+
+Frustum GetTileFrustrum(const Frustum& f,const int& width, const int& height)
+{
+	Frustum result;
+	Vector3 vertex[8];
+
+	float wNum = float(width);
+	float hNum = float(height);
+
+
+	Vector3 frontWidthVec = f.vertex[1] - f.vertex[0];
+	Vector3 frontHeightVec = f.vertex[2] - f.vertex[0];
+
+	Vector3 backWidthVec = f.vertex[5] - f.vertex[4];
+	Vector3 backHeightVec = f.vertex[6] - f.vertex[4];
+
+	frontWidthVec = frontWidthVec / kTileWidthNum;
+	frontHeightVec = frontHeightVec / kTileHeightNum;
+
+	backWidthVec = backWidthVec / kTileWidthNum;
+	backHeightVec = backHeightVec / kTileHeightNum;
+
+	Vector3 tileWidthLeft = frontWidthVec * wNum;
+	Vector3 tileWidthRight = frontWidthVec * (wNum + 1);
+	Vector3 tileHeightTop = frontHeightVec * hNum;
+	Vector3 tileHeightBottom = frontHeightVec * (hNum + 1);
+
+	vertex[0] = f.vertex[0] + tileWidthLeft + tileHeightTop;
+	vertex[1] = f.vertex[0] + tileWidthRight + tileHeightTop;
+	vertex[2] = f.vertex[0] + tileWidthLeft + tileHeightBottom;
+	vertex[3] = f.vertex[0] + tileWidthRight + tileHeightBottom;
+
+	tileWidthLeft = backWidthVec * wNum;
+	tileWidthRight = backWidthVec * (wNum + 1);
+	tileHeightTop = backHeightVec * hNum;
+	tileHeightBottom = backHeightVec * (hNum + 1);
+
+	vertex[4] = f.vertex[4] + tileWidthLeft + tileHeightTop;
+	vertex[5] = f.vertex[4] + tileWidthRight + tileHeightTop;
+	vertex[6] = f.vertex[4] + tileWidthLeft + tileHeightBottom;
+	vertex[7] = f.vertex[4] + tileWidthRight + tileHeightBottom;
+
+	result = MakeFrustum(vertex[0], vertex[1], vertex[2], vertex[3], vertex[4], vertex[5], vertex[6], vertex[7]);
+
+	return result;
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -661,41 +711,45 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
 	Matrix4x4 viewProjectionMatrix = viewMatrix * projectionMatrix;
 
+
+	Vector3 Dcameracenterition = { 0.0f,1.9f,-6.49f };
+	Vector3 DcameraRotate = { 0.26f,0.0f,0.0f };
+
+	Matrix4x4 DcameraMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, DcameraRotate, Dcameracenterition);
+	Matrix4x4 DviewMatrix = Inverse(DcameraMatrix);
+	Matrix4x4 DprojectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 10.0f, 50.0f);
+	Matrix4x4 DviewProjectionMatrix = DviewMatrix * DprojectionMatrix;
+
+	Matrix4x4 m = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
+	Matrix4x4 in = Inverse(m);
+	Matrix4x4 initialMat = in * DprojectionMatrix;
+	Frustum initialFrustum = MakeFrustum(Inverse(initialMat));
+
 	//Viewportmatrixを作る
 	Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-	float deltTime = 1.0f / 60.0f;
-
-	
-	
-	Ball ball{};
-	ball.position = { 0.8f,1.2f,0.3f };
-	ball.mass = 2.0f;
-	ball.radius = 0.05f;
-	ball.color = WHITE;
-	const Vector3 kGravity{ 0.0f,-9.8f,0.0f };
-	ball.accelertion = kGravity;
-
-	struct Capsule {
-		Segment segment;
-		float radius;
-	};
-
-	Capsule capsule;
-	capsule.radius = ball.radius;
-	capsule.segment = {0.0f,0.0f,0.0f};
-
-	Plane plane;
-	plane.normal = Normalize({-0.2f,0.9f,-0.3f});
-	plane.distance = 0.0f;
-
-
-	float e = 0.8f;
-
+	//float deltTime = 1.0f / 60.0f;
 	bool start = false;
 
+	Sphere sphere{
+		{0.0f,0.0f,0.0f},
+		1.0f
+	};
 
+	Frustum tileFrustrum[kTileWidthNum * kTileHeightNum];
+	Frustum tileInitialFrustrum[kTileWidthNum * kTileHeightNum];
+
+	for (int i = 0; i < kTileNum; i++) {
+		int height = i / kTileWidthNum;
+		int width = i % kTileWidthNum;
+
+		tileInitialFrustrum[i] = GetTileFrustrum(initialFrustum,width, height);
+	}
 	
+	bool isHit = false;
+
+	bool tileIsHit[kTileNum];
+
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
 		// フレームの開始
@@ -712,32 +766,73 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		cameraMatrix = MakeAffineMatrix({1.0f,1.0f,1.0f}, cameraRotate, cameracenterition);
 		viewMatrix = Inverse(cameraMatrix);
 		viewProjectionMatrix = viewMatrix * projectionMatrix;
+
+		if (Key::IsPressed(DIK_R)) {
+			DcameraRotate.y += 0.01f;
+		}
+		if (Key::IsPressed(DIK_L)) {
+			DcameraRotate.y -= 0.01f;
+		}
+		DcameraMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, DcameraRotate, Dcameracenterition);
+		DviewMatrix = Inverse(DcameraMatrix);
+		DviewProjectionMatrix = DviewMatrix * DprojectionMatrix;
+
+		for (int i = 0; i < kTileNum; i++) {
+			tileFrustrum[i] = tileInitialFrustrum[i] * DcameraMatrix;
+		}
+
 		//
 		//ゲームの処理
 
-		if (start) {
-			Vector3 prePosition = ball.position;
-			ball.velocity += ball.accelertion * deltTime;
-			ball.position += ball.velocity * deltTime;
+		isHit = false;
 
-			capsule = { { prePosition,ball.position - prePosition }, ball.radius };
-			Segment closestSegemnt = { capsule.segment.origin - plane.normal * capsule.radius,capsule.segment.diff };
-
-			Vector3 intersectPoint{};
-			if (IsCollision( closestSegemnt, plane, intersectPoint)) {
-				ball.position = intersectPoint + plane.normal * (capsule.radius + 0.0001f);
-				ball.velocity = Reflect(ball.velocity, plane.normal) * e;
-			}
-
+		for (int i = 0; i < kTileNum; i++) {
+			tileIsHit[i] = false;
 		}
-			
-			
+
+
+		frustum = MakeFrustum(Inverse(DviewProjectionMatrix));
+
+
+		DcameraMatrix;
+
+		if (Key::IsPressed(DIK_W)) {
+			sphere.center.z += 0.1f;
+		}
+		if (Key::IsPressed(DIK_A)) {
+			sphere.center.x -= 0.1f;
+		}
+		if (Key::IsPressed(DIK_S)) {
+			sphere.center.z -= 0.1f;
+		}
+		if (Key::IsPressed(DIK_D)) {
+			sphere.center.x += 0.1f;
+		}
+
+		if (Key::IsPressed(DIK_SPACE)) {
+			sphere.center.y += 0.1f;
+		}
+
+		if (Key::IsPressed(DIK_E)) {
+			sphere.center.y -= 0.1f;
+		}
+		
+		isHit = IsCollision(frustum, sphere);
+
+		for (int i = 0; i < kTileNum; i++) {
+			tileIsHit[i] = IsCollision(tileFrustrum[i], sphere);
+		}
 
 		//
 		//ImGui
 		ImGui::Begin("window");
 		if (ImGui::Button("start")) {
-			start = true;
+			if (start == true) {
+				start = false;
+			}
+			else {
+				start = true;
+			}
 		}
 		ImGui::End();
 		///
@@ -748,10 +843,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 		
-		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
-		DrawSphere({ ball.position,ball.radius }, viewProjectionMatrix, viewportMatrix, BLUE);
+		if (start == false) {
+			if (isHit) {
+				DrawFrustum(frustum, viewProjectionMatrix, viewportMatrix, RED);
+			}
+			else {
+				DrawFrustum(frustum, viewProjectionMatrix, viewportMatrix, WHITE);
+			}
+		}
+		
+		
+		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, WHITE);
 
+
+		for (int i = 0; i < kTileNum; i++) {
+			if (tileIsHit[i]) {
+				DrawFrustum(tileFrustrum[i], viewProjectionMatrix, viewportMatrix, RED);
+			}
+			else {
+				DrawFrustum(tileFrustrum[i], viewProjectionMatrix, viewportMatrix, WHITE);
+			}
+		}
 
 		///
 		/// ↑描画処理ここまで
